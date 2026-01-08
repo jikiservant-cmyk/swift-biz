@@ -45,4 +45,11 @@ export type CashBook = {
   id: string;
   headers: string[];
   gridData: { [key: string]: string }[];
+  selectedRows?: number[];
+  selectedCols?: number[];
+  chartType?: 'bar' | 'line' | 'area' | 'pie';
+  isChartVisible?: boolean;
+  isAiAnalysisVisible?: boolean;
 };
+
+    

@@ -20,21 +20,27 @@ import type { CashBook } from "@/lib/types";
 import { doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
+type ChartType = "bar" | "line" | "area" | "pie";
 
 export function CashBookPage() {
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [headers, setHeaders] = useState<string[]>([]);
   const [gridData, setGridData] = useState<string[][]>([]);
   const [viewData, setViewData] = useState<string[][]>([]);
+  
+  // These states are now primarily for local interaction, but will be synced with Firestore.
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [selectedCols, setSelectedCols] = useState<Set<number>>(new Set());
+  const [chartType, setChartType] = useState<ChartType>("bar");
+  const [isChartVisible, setIsChartVisible] = useState(false);
+  const [isAiAnalysisVisible, setIsAiAnalysisVisible] = useState(false);
+  
   const [chartData, setChartData] = useState<any[]>([]);
-  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "pie">("bar");
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cashbookDocRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid, 'cashbooks', 'main') : null),
@@ -42,17 +48,17 @@ export function CashBookPage() {
   );
   const { data: cashbookData, isLoading: isCashbookLoading } = useDoc<CashBook>(cashbookDocRef);
 
-  // Load data from Firestore
+  // Load data from Firestore and sync local state
   useEffect(() => {
     if (cashbookData) {
       const loadedHeaders = cashbookData.headers || ["Header 1", "Header 2", "Header 3"];
       setHeaders(loadedHeaders);
       
-      if(cashbookData.gridData) {
+      if (cashbookData.gridData) {
         const loadedGridData = cashbookData.gridData.map(rowObj => {
           const rowArray: string[] = [];
-          for(let i=0; i<loadedHeaders.length; i++) {
-              rowArray[i] = rowObj[`col_${i}`] || "";
+          for (let i = 0; i < loadedHeaders.length; i++) {
+            rowArray[i] = rowObj[`col_${i}`] || "";
           }
           return rowArray;
         });
@@ -61,7 +67,15 @@ export function CashBookPage() {
         setGridData([["", "", ""], ["", "", ""], ["", "", ""]]);
       }
 
+      // Sync UI state from Firestore
+      setSelectedRows(new Set(cashbookData.selectedRows || []));
+      setSelectedCols(new Set(cashbookData.selectedCols || []));
+      setChartType(cashbookData.chartType || 'bar');
+      setIsChartVisible(cashbookData.isChartVisible || false);
+      setIsAiAnalysisVisible(cashbookData.isAiAnalysisVisible || false);
+
     } else if (!isCashbookLoading) {
+      // Initialize for a new document
       const initialHeaders = ["Header 1", "Header 2", "Header 3"];
       setHeaders(initialHeaders);
       setGridData([
@@ -156,40 +170,39 @@ export function CashBookPage() {
     setGridData(gridData.map(row => [...row, ""]));
   };
 
-  const saveData = useCallback(() => {
-    if (!cashbookDocRef || isCashbookLoading) {
-      return;
-    }
-    
-    const gridDataForFirestore = gridData.map(row => {
-      const rowObj: {[key: string]: string} = {};
-      row.forEach((cell, index) => {
-        rowObj[`col_${index}`] = cell;
-      });
-      return rowObj;
-    });
-
-    const dataToSave: CashBook = { id: 'main', headers, gridData: gridDataForFirestore };
+  const saveData = useCallback((dataToSave: Partial<CashBook>) => {
+    if (!cashbookDocRef) return;
     
     setDocumentNonBlocking(cashbookDocRef, dataToSave, { merge: true });
-
-    toast({
-      title: "Data Synced!",
-      description: "Your cash book is saved in real-time.",
-    });
-  }, [cashbookDocRef, gridData, headers, isCashbookLoading, toast]);
+    
+  }, [cashbookDocRef]);
   
-  // Real-time save effect
+  // Real-time save effect for all data and UI state
   useEffect(() => {
-    if (isCashbookLoading) return; // Don't save while initial data is loading
+    if (isCashbookLoading) return;
     const handler = setTimeout(() => {
-      saveData();
+      const gridDataForFirestore = gridData.map(row => {
+        const rowObj: {[key: string]: string} = {};
+        row.forEach((cell, index) => {
+          rowObj[`col_${index}`] = cell;
+        });
+        return rowObj;
+      });
+
+      const dataToSync: Partial<CashBook> = {
+        headers,
+        gridData: gridDataForFirestore,
+        selectedRows: Array.from(selectedRows),
+        selectedCols: Array.from(selectedCols),
+        chartType,
+        isChartVisible,
+        isAiAnalysisVisible,
+      };
+      saveData(dataToSync);
     }, 1000); // Debounce saves to every 1 second
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [gridData, headers, saveData, isCashbookLoading]);
+    return () => clearTimeout(handler);
+  }, [gridData, headers, selectedRows, selectedCols, chartType, isChartVisible, isAiAnalysisVisible, isCashbookLoading, saveData]);
 
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,7 +225,7 @@ export function CashBookPage() {
           setGridData(newGridData);
           toast({
             title: "File Uploaded",
-            description: "Data from the Excel file has been loaded. It will be saved automatically.",
+            description: "Data from the Excel file has been loaded and will be synced.",
           });
         }
       } catch (error) {
@@ -252,35 +265,12 @@ export function CashBookPage() {
     setSelectedCols(newSelection);
   };
 
-  const getSelectedData = useCallback(() => {
-    if (selectedRows.size === 0 || selectedCols.size === 0) {
-      return [];
+  const generateChartData = useCallback(() => {
+    if (!isChartVisible || selectedRows.size === 0 || selectedCols.size === 0) {
+        setChartData([]);
+        return;
     }
-
-    const selCols = Array.from(selectedCols).sort((a, b) => a - b);
     
-    const data = Array.from(selectedRows).map(rowIndex => {
-        const row = viewData[rowIndex];
-        const entry: {[key: string]: string} = {};
-
-        selCols.forEach(colIndex => {
-            const header = headers[colIndex] || `Column ${colIndex + 1}`;
-            entry[header] = row[colIndex];
-        });
-
-        return entry;
-    });
-
-    return data;
-
-  }, [selectedRows, selectedCols, headers, viewData]);
-
-  const handleGenerateChart = useCallback(() => {
-    if (selectedRows.size === 0 || selectedCols.size < 2) {
-      setChartData([]); // Clear chart data if selection is invalid
-      return;
-    }
-
     if (chartType === 'pie' && selectedCols.size > 2) {
       setChartData([]);
       toast({
@@ -313,10 +303,25 @@ export function CashBookPage() {
     });
 
     setChartData(data);
-  }, [selectedRows, selectedCols, viewData, headers, chartType, toast]);
+  }, [isChartVisible, selectedRows, selectedCols, viewData, headers, chartType, toast]);
 
-  const handleAiAnalysis = useCallback(async () => {
-    const selectedData = getSelectedData();
+  const runAiAnalysis = useCallback(async () => {
+    if (!isAiAnalysisVisible || selectedRows.size === 0 || selectedCols.size === 0) {
+        setAiAnalysis(null);
+        return;
+    }
+
+    const selCols = Array.from(selectedCols).sort((a, b) => a - b);
+    const selectedData = Array.from(selectedRows).map(rowIndex => {
+        const row = viewData[rowIndex];
+        const entry: {[key: string]: string} = {};
+        selCols.forEach(colIndex => {
+            const header = headers[colIndex] || `Column ${colIndex + 1}`;
+            entry[header] = row[colIndex];
+        });
+        return entry;
+    });
+
     if (selectedData.length === 0) {
       setAiAnalysis(null);
       return;
@@ -332,25 +337,13 @@ export function CashBookPage() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [getSelectedData]);
+  }, [isAiAnalysisVisible, selectedRows, selectedCols, headers, viewData]);
   
-  // Effect for real-time chart updates
+  // Effect for real-time chart data generation and AI analysis
   useEffect(() => {
-    if (chartData.length > 0) {
-      handleGenerateChart();
-    }
-  }, [viewData, selectedRows, selectedCols, chartType, handleGenerateChart, chartData.length]);
-
-  // Effect for real-time AI analysis
-  useEffect(() => {
-    const debounceTimeout = setTimeout(() => {
-      if (aiAnalysis !== null) {
-        handleAiAnalysis();
-      }
-    }, 500); // Debounce to avoid excessive API calls while typing
-
-    return () => clearTimeout(debounceTimeout);
-  }, [viewData, selectedRows, selectedCols, handleAiAnalysis, aiAnalysis]);
+    generateChartData();
+    runAiAnalysis();
+  }, [viewData, selectedRows, selectedCols, isChartVisible, isAiAnalysisVisible, generateChartData, runAiAnalysis]);
 
 
   const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", "#FFBB28", "#FF8042"], []);
@@ -430,8 +423,8 @@ export function CashBookPage() {
     }
   };
   
-  const handleInitialChartGeneration = () => {
-    if (selectedRows.size === 0 || selectedCols.size < 2) {
+  const handleToggleChart = () => {
+    if (!isChartVisible && (selectedRows.size === 0 || selectedCols.size < 2)) {
       toast({
         title: "Not enough data selected",
         description: "Please select at least one row and two columns (one for labels, one for values).",
@@ -439,11 +432,11 @@ export function CashBookPage() {
       });
       return;
     }
-    handleGenerateChart();
+    setIsChartVisible(prev => !prev);
   };
 
-  const handleInitialAiAnalysis = () => {
-     if (selectedRows.size === 0 || selectedCols.size === 0) {
+  const handleToggleAiAnalysis = () => {
+     if (!isAiAnalysisVisible && (selectedRows.size === 0 || selectedCols.size === 0)) {
       toast({
         title: "No data selected",
         description: "Please select some rows and columns to analyze.",
@@ -451,7 +444,7 @@ export function CashBookPage() {
       });
       return;
     }
-    handleAiAnalysis();
+    setIsAiAnalysisVisible(prev => !prev);
   };
 
 
@@ -462,7 +455,7 @@ export function CashBookPage() {
         <CardHeader>
           <CardTitle>Data Grid</CardTitle>
           <CardDescription>
-            An editable grid for your cash book data. This data is now saved in real-time. You can perform calculations by starting a cell with '=' (e.g., =A1+B2). Select rows and columns to generate a chart or AI analysis.
+            An editable grid for your cash book data. Changes are synced in real-time across your devices. Select rows and columns to generate a chart or AI analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -483,8 +476,8 @@ export function CashBookPage() {
             <Button onClick={() => fileInputRef.current?.click()} variant="outline">
               <Upload className="mr-2 h-4 w-4" /> Upload Excel
             </Button>
-            <Button onClick={handleInitialChartGeneration} variant="default">
-              <BarChart className="mr-2 h-4 w-4" /> Generate Chart
+            <Button onClick={handleToggleChart} variant="default">
+              <BarChart className="mr-2 h-4 w-4" /> {isChartVisible ? 'Hide Chart' : 'Show Chart'}
             </Button>
             <Select value={chartType} onValueChange={(value) => setChartType(value as any)}>
               <SelectTrigger className="w-[180px]">
@@ -505,8 +498,8 @@ export function CashBookPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
-             <Button onClick={handleInitialAiAnalysis} disabled={isAnalyzing}>
-              <Wand2 className="mr-2 h-4 w-4" /> {isAnalyzing ? 'Analyzing...' : 'Analyze with AI'}
+             <Button onClick={handleToggleAiAnalysis} disabled={isAnalyzing}>
+              <Wand2 className="mr-2 h-4 w-4" /> {isAiAnalysisVisible ? 'Hide Analysis' : 'Analyze with AI'}
             </Button>
           </div>
           <div className="overflow-x-auto">
@@ -574,30 +567,36 @@ export function CashBookPage() {
         </CardContent>
       </Card>
       
-      {chartData.length > 0 && (
+      {isChartVisible && (
         <Card className="mt-8">
             <CardHeader>
                 <CardTitle>Chart Analysis</CardTitle>
                 <CardDescription>
-                    {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart of your selected data. The chart will update in real-time as you edit the grid or change your selection.
+                    {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart of your selected data. The chart updates in real-time as you edit the grid or change your selection.
                 </CardDescription>
             </CardHeader>
             <CardContent className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    {renderChart()}
-                </ResponsiveContainer>
+                {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        {renderChart()}
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Select data and generate a chart to see it here.
+                    </div>
+                )}
             </CardContent>
         </Card>
       )}
 
-      {(isAnalyzing || aiAnalysis) && (
+      {isAiAnalysisVisible && (
         <Card className="mt-8">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Wand2 className="h-5 w-5 text-primary" /> AI Analysis
                 </CardTitle>
                 <CardDescription>
-                    AI-powered insights based on your selected data. This analysis will update in real-time as you edit the grid.
+                    AI-powered insights based on your selected data. This analysis updates in real-time as you edit the grid.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -607,10 +606,14 @@ export function CashBookPage() {
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-1/2" />
                   </div>
-                ) : (
+                ) : aiAnalysis ? (
                   <div className="prose prose-sm max-w-none text-foreground dark:prose-invert whitespace-pre-wrap">
                     {aiAnalysis}
                   </div>
+                ) : (
+                   <div className="flex items-center justify-center h-24 text-muted-foreground">
+                        Select data and click "Analyze with AI" to see insights here.
+                    </div>
                 )}
             </CardContent>
         </Card>
@@ -618,4 +621,4 @@ export function CashBookPage() {
     </>
   );
 }
-
+    
