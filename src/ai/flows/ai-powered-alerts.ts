@@ -62,7 +62,13 @@ const generateAlertsFlow = ai.defineFlow(
     outputSchema: AIPoweredAlertsOutputSchema,
   },
   async input => {
-    const {output} = await alertPrompt(input);
-    return output!;
+    try {
+      const {output} = await alertPrompt(input);
+      return output!;
+    } catch (e) {
+      console.error('Error generating alerts:', e);
+      // Return empty alerts if the AI model fails
+      return { alerts: [] };
+    }
   }
 );
