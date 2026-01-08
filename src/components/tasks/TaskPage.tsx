@@ -91,7 +91,13 @@ export function TaskPage() {
         dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
         userId: user.uid,
       };
-      delete taskPayload.id; // Ensure no 'id' field is present when creating a new doc
+      
+      // Firestore's addDoc fails if an 'id' field is present but undefined.
+      // When creating a new document, we must remove it.
+      if (!taskPayload.id) {
+        delete taskPayload.id;
+      }
+
       const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
       addDocumentNonBlocking(tasksCol, taskPayload);
       toast({ title: 'Task created', description: 'A new task has been added to your list.' });
@@ -345,4 +351,3 @@ export function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients
     </Dialog>
   );
 }
-

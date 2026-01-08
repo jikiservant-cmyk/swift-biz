@@ -33,11 +33,18 @@ export default function Home() {
     if (!firestore || !user) return;
 
     // Creating a new task
-    const taskPayload = {
+    const taskPayload: any = {
       ...taskData,
       dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
       userId: user.uid,
     };
+    
+    // Firestore's addDoc fails if an 'id' field is present but undefined.
+    // When creating a new document, we must remove it.
+    if (!taskPayload.id) {
+        delete taskPayload.id;
+    }
+
     const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
     addDocumentNonBlocking(tasksCol, taskPayload);
     toast({ title: 'Task created', description: 'A new task has been added to your list.' });
