@@ -22,7 +22,7 @@ import { Task, User, Client } from '@/lib/types';
 import { formatDate } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, doc, Timestamp } from 'firebase/firestore';
+import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { users as staticUsers } from '@/lib/data'; 
 
@@ -40,7 +40,7 @@ export function TaskPage() {
   const tasksWithDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
 
   const clientsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, 'users', user.uid, 'clients') : null),
+    () => (user ? query(collection(firestore, 'clients'), where(`members.${user.uid}`, 'in', ['owner', 'viewer'])) : null),
     [firestore, user]
   );
   const { data: clients } = useCollection<Client>(clientsQuery);
@@ -339,3 +339,5 @@ export function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients
     </Dialog>
   );
 }
+
+    

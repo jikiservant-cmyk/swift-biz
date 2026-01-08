@@ -10,9 +10,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Client, Task } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, doc, Timestamp } from 'firebase/firestore';
+import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +23,7 @@ export function ClientsPage() {
   const { toast } = useToast();
 
   const clientsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, 'users', user.uid, 'clients') : null),
+    () => (user ? query(collection(firestore, 'clients'), where(`members.${user.uid}`, 'in', ['owner', 'viewer'])) : null),
     [firestore, user]
   );
   const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
@@ -52,14 +52,19 @@ export function ClientsPage() {
     
     if (clientData.id) {
       // Editing
-      const clientPayload = { ...clientData, userId: user.uid };
-      const clientRef = doc(firestore, 'users', user.uid, 'clients', clientData.id);
+      const clientPayload = { ...clientData };
+      const clientRef = doc(firestore, 'clients', clientData.id);
       updateDocumentNonBlocking(clientRef, clientPayload);
       toast({ title: 'Client updated' });
     } else {
       // Creating
-      const clientPayload = { ...clientData, userId: user.uid };
-      const clientsCol = collection(firestore, 'users', user.uid, 'clients');
+      const clientPayload = { 
+        ...clientData, 
+        members: {
+            [user.uid]: 'owner'
+        }
+      };
+      const clientsCol = collection(firestore, 'clients');
       addDocumentNonBlocking(clientsCol, clientPayload);
       toast({ title: 'Client added' });
     }
@@ -305,3 +310,4 @@ function BulkSmsDialog({ isOpen, setIsOpen, onSend }: { isOpen: boolean; setIsOp
     </Dialog>
   );
 }
+    

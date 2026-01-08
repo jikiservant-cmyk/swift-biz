@@ -191,11 +191,19 @@
         "notes": {
           "type": "string",
           "description": "Notes about the client."
+        },
+        "members": {
+          "type": "object",
+          "description": "A map of user UIDs to their roles (e.g., 'owner', 'viewer'). Used for authorization.",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "id",
-        "contactInfo"
+        "contactInfo",
+        "members"
       ]
     },
     "Payment": {

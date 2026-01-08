@@ -3,7 +3,7 @@
 
 import { Suspense, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { AIAlerts } from "@/components/dashboard/AIAlerts";
+import { AIAlertsWrapper } from "@/components/dashboard/AIAlertsWrapper";
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,12 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { TaskFormDialog } from "@/components/tasks/TaskPage";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
-import { Client, Task, User } from "@/lib/types";
-import { users as staticUsers } from "@/lib/data";
+import { collection, query, where, Timestamp } from "firebase/firestore";
+import { Client, Task } from "@/lib/types";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { users as staticUsers } from '@/lib/data';
+
 
 export default function Home() {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -24,7 +24,7 @@ export default function Home() {
   const { toast } = useToast();
 
   const clientsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, 'users', user.uid, 'clients') : null),
+    () => (user ? query(collection(firestore, 'clients'), where(`members.${user.uid}`, 'in', ['owner', 'viewer'])) : null),
     [firestore, user]
   );
   const { data: clients } = useCollection<Client>(clientsQuery);
@@ -57,7 +57,7 @@ export default function Home() {
         }
       />
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        <AIAlerts />
+        <AIAlertsWrapper />
       </Suspense>
       <OverviewCards />
       <div className="mt-8">
@@ -74,3 +74,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
