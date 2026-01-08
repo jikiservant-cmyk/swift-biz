@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -69,26 +70,22 @@ export function FinancialsPage() {
     setDialogState({ isOpen: true, type, editingTransaction: transaction });
   };
   
-  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date' | 'userId'> & { id?: string, date?: Date }) => {
+  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date'> & { id?: string, date?: Date }) => {
     if (!firestore || !user) return;
     
     const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
     
+    const txPayload = {
+      ...txData,
+      date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
+      userId: user.uid,
+    };
+    
     if (txData.id) { // Editing
-      const txPayload = {
-        ...txData,
-        date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
-        userId: user.uid,
-      };
       const txRef = doc(firestore, 'users', user.uid, collectionName, txData.id);
       updateDocumentNonBlocking(txRef, txPayload);
       toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
     } else { // Creating
-      const txPayload = {
-        ...txData,
-        date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
-        userId: user.uid,
-      };
       const txCol = collection(firestore, 'users', user.uid, collectionName);
       addDocumentNonBlocking(txCol, txPayload);
       toast({ title: "Transaction added", description: "A new transaction has been recorded." });
@@ -189,7 +186,7 @@ function TransactionsTable({ type, transactions, onEdit, onDelete, isLoading }: 
 function TransactionFormDialog({ state, setState, onSave }: { state: TransactionDialogState, setState: (state: TransactionDialogState) => void, onSave: (data: any) => void }) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  const [amount, setAmount] = useState<number | "">("");
+  const [amount, setAmount] = useState<number | string>("");
   const [date, setDate] = useState<Date | undefined>(new Date());
 
   React.useEffect(() => {
@@ -217,7 +214,7 @@ function TransactionFormDialog({ state, setState, onSave }: { state: Transaction
         <DialogHeader><DialogTitle>{state.editingTransaction ? 'Edit' : 'Add'} {state.type === 'income' ? 'Income' : 'Expense'}</DialogTitle></DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="description" className="text-right">Description</Label><Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" /></div>
-          <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="amount" className="text-right">Amount</Label><Input id="amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="col-span-3" /></div>
+          <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="amount" className="text-right">Amount</Label><Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3" /></div>
           <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="category" className="text-right">Category</Label><Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3" /></div>
           <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="date" className="text-right">Date</Label><DatePicker date={date} setDate={setDate} className="col-span-3" /></div>
         </div>
@@ -229,3 +226,5 @@ function TransactionFormDialog({ state, setState, onSave }: { state: Transaction
     </Dialog>
   );
 }
+
+    
