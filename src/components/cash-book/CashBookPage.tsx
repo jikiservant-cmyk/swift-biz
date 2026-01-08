@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from "lucide-react";
+import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Wand2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { analyzeCashBookData } from "@/ai/flows/cash-book-analysis";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export function CashBookPage() {
@@ -23,6 +25,8 @@ export function CashBookPage() {
   const [selectedCols, setSelectedCols] = useState<Set<number>>(new Set());
   const [chartData, setChartData] = useState<any[]>([]);
   const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     try {
@@ -178,6 +182,29 @@ export function CashBookPage() {
     setSelectedCols(newSelection);
   };
 
+  const getSelectedData = useCallback(() => {
+    if (selectedRows.size === 0 || selectedCols.size === 0) {
+      return [];
+    }
+
+    const selCols = Array.from(selectedCols).sort((a, b) => a - b);
+    
+    const data = Array.from(selectedRows).map(rowIndex => {
+        const row = viewData[rowIndex];
+        const entry: {[key: string]: string} = {};
+
+        selCols.forEach(colIndex => {
+            const header = headers[colIndex] || `Column ${colIndex + 1}`;
+            entry[header] = row[colIndex];
+        });
+
+        return entry;
+    });
+
+    return data;
+
+  }, [selectedRows, selectedCols, headers, viewData]);
+
   const handleGenerateChart = () => {
     if (selectedRows.size === 0 || selectedCols.size < 2) {
       toast({
@@ -209,6 +236,35 @@ export function CashBookPage() {
 
     setChartData(data);
   };
+
+  const handleAiAnalysis = async () => {
+    const selectedData = getSelectedData();
+    if (selectedData.length === 0) {
+      toast({
+        title: "No data selected",
+        description: "Please select some rows and columns to analyze.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAiAnalysis(null);
+    try {
+      const result = await analyzeCashBookData({ jsonData: JSON.stringify(selectedData, null, 2) });
+      setAiAnalysis(result.analysis);
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "AI Analysis Failed",
+        description: "There was an error while analyzing the data.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
 
   const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F"], []);
   const selectedDataHeaders = useMemo(() => {
@@ -278,11 +334,11 @@ export function CashBookPage() {
         <CardHeader>
           <CardTitle>Data Grid</CardTitle>
           <CardDescription>
-            An editable grid for your cash book data. You can perform calculations by starting a cell with '=' (e.g., =A1+B2). Select rows and columns to generate a chart.
+            An editable grid for your cash book data. You can perform calculations by starting a cell with '=' (e.g., =A1+B2). Select rows and columns to generate a chart or AI analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <Button onClick={addRow}>
               <Plus className="mr-2 h-4 w-4" /> Add Row
             </Button>
@@ -311,6 +367,9 @@ export function CashBookPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
+             <Button onClick={handleAiAnalysis} disabled={isAnalyzing}>
+              <Wand2 className="mr-2 h-4 w-4" /> {isAnalyzing ? 'Analyzing...' : 'Analyze with AI'}
+            </Button>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -381,6 +440,32 @@ export function CashBookPage() {
                 <ResponsiveContainer width="100%" height="100%">
                     {renderChart()}
                 </ResponsiveContainer>
+            </CardContent>
+        </Card>
+      )}
+
+      {(isAnalyzing || aiAnalysis) && (
+        <Card className="mt-8">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wand2 className="h-5 w-5 text-primary" /> AI Analysis
+                </CardTitle>
+                <CardDescription>
+                    AI-powered insights based on your selected data.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isAnalyzing ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ) : (
+                  <div className="prose prose-sm max-w-none text-foreground dark:prose-invert whitespace-pre-wrap">
+                    {aiAnalysis}
+                  </div>
+                )}
             </CardContent>
         </Card>
       )}
