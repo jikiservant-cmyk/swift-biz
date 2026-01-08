@@ -86,11 +86,12 @@ export function TaskPage() {
       toast({ title: 'Task updated', description: 'The task has been successfully updated.' });
     } else {
       // Creating
-      const taskPayload = {
+      const taskPayload: any = {
         ...taskData,
         dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
         userId: user.uid,
       };
+      delete taskPayload.id; // Ensure no 'id' field is present when creating a new doc
       const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
       addDocumentNonBlocking(tasksCol, taskPayload);
       toast({ title: 'Task created', description: 'A new task has been added to your list.' });
@@ -340,4 +341,3 @@ export function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients
   );
 }
 
-    
