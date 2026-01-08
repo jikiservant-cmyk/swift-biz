@@ -170,35 +170,36 @@ export function CashBookPage() {
     setGridData(gridData.map(row => [...row, ""]));
   };
 
-  const saveData = useCallback((dataToSave: Partial<CashBook>) => {
+  const saveData = useCallback(() => {
     if (!cashbookDocRef) return;
     
-    setDocumentNonBlocking(cashbookDocRef, dataToSave, { merge: true });
+    const gridDataForFirestore = gridData.map(row => {
+      const rowObj: {[key: string]: string} = {};
+      row.forEach((cell, index) => {
+        rowObj[`col_${index}`] = cell;
+      });
+      return rowObj;
+    });
+
+    const dataToSync: Partial<CashBook> = {
+      headers,
+      gridData: gridDataForFirestore,
+      selectedRows: Array.from(selectedRows),
+      selectedCols: Array.from(selectedCols),
+      chartType,
+      isChartVisible,
+      isAiAnalysisVisible,
+    };
     
-  }, [cashbookDocRef]);
+    setDocumentNonBlocking(cashbookDocRef, dataToSync, { merge: true });
+    
+  }, [cashbookDocRef, gridData, headers, selectedRows, selectedCols, chartType, isChartVisible, isAiAnalysisVisible]);
   
   // Real-time save effect for all data and UI state
   useEffect(() => {
     if (isCashbookLoading) return;
     const handler = setTimeout(() => {
-      const gridDataForFirestore = gridData.map(row => {
-        const rowObj: {[key: string]: string} = {};
-        row.forEach((cell, index) => {
-          rowObj[`col_${index}`] = cell;
-        });
-        return rowObj;
-      });
-
-      const dataToSync: Partial<CashBook> = {
-        headers,
-        gridData: gridDataForFirestore,
-        selectedRows: Array.from(selectedRows),
-        selectedCols: Array.from(selectedCols),
-        chartType,
-        isChartVisible,
-        isAiAnalysisVisible,
-      };
-      saveData(dataToSync);
+      saveData();
     }, 1000); // Debounce saves to every 1 second
 
     return () => clearTimeout(handler);
@@ -621,4 +622,5 @@ export function CashBookPage() {
     </>
   );
 }
+
     
