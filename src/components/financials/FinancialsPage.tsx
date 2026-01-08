@@ -27,6 +27,7 @@ export function FinancialsPage({ initialTransactions }: { initialTransactions: T
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [dialogState, setDialogState] = useState<TransactionDialogState>({ isOpen: false, type: 'income', editingTransaction: null });
+  const [activeTab, setActiveTab] = useState("income");
 
   const monthlyTxs = useMemo(() => {
     const now = new Date();
@@ -93,7 +94,7 @@ export function FinancialsPage({ initialTransactions }: { initialTransactions: T
         </Card>
       </div>
 
-      <Tabs defaultValue="income">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList><TabsTrigger value="income">Income</TabsTrigger><TabsTrigger value="expense">Expenses</TabsTrigger></TabsList>
         <TabsContent value="income"><TransactionsTable type="income" transactions={transactions.filter(t => t.type === 'income')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} /></TabsContent>
         <TabsContent value="expense"><TransactionsTable type="expense" transactions={transactions.filter(t => t.type === 'expense')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction}/></TabsContent>
