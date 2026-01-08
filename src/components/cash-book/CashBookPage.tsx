@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Wand2, Upload } from "lucide-react";
+import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Wand2, Upload, PieChart as PieChartIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { analyzeCashBookData } from "@/ai/flows/cash-book-analysis";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +25,7 @@ export function CashBookPage() {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [selectedCols, setSelectedCols] = useState<Set<number>>(new Set());
   const [chartData, setChartData] = useState<any[]>([]);
-  const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
+  const [chartType, setChartType] = useState<"bar" | "line" | "area" | "pie">("bar");
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -253,6 +253,15 @@ export function CashBookPage() {
       return;
     }
 
+    if (chartType === 'pie' && selectedCols.size > 2) {
+      toast({
+        title: "Invalid selection for Pie Chart",
+        description: "Please select one column for labels and one column for values for a pie chart.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const selCols = Array.from(selectedCols).sort((a, b) => a - b);
     const labelColumnIndex = selCols[0];
     const dataColumnIndices = selCols.slice(1);
@@ -267,6 +276,10 @@ export function CashBookPage() {
             const header = headers[colIndex] || `Column ${colIndex + 1}`;
             const value = parseFloat(row[colIndex]);
             chartEntry[header] = isNaN(value) ? 0 : value;
+            // For pie chart, we'll just use a generic 'value' key
+            if (chartType === 'pie') {
+                chartEntry['value'] = isNaN(value) ? 0 : value;
+            }
         });
 
         return chartEntry;
@@ -304,7 +317,7 @@ export function CashBookPage() {
   };
 
 
-  const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F"], []);
+  const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", "#FFBB28", "#FF8042"], []);
   const selectedDataHeaders = useMemo(() => {
       if (selectedCols.size < 2) return [];
       const selCols = Array.from(selectedCols).sort((a, b) => a - b);
@@ -359,6 +372,23 @@ export function CashBookPage() {
                     ))}
                 </AreaChart>
             );
+        case 'pie':
+            return (
+                <RechartsPieChart>
+                  <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                        background: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))"
+                    }}
+                  />
+                  <Legend />
+                </RechartsPieChart>
+            );
         default:
             return null;
     }
@@ -412,6 +442,9 @@ export function CashBookPage() {
                 </SelectItem>
                 <SelectItem value="area">
                    <div className="flex items-center"><AreaChartIcon className="mr-2 h-4 w-4" />Area Chart</div>
+                </SelectItem>
+                <SelectItem value="pie">
+                   <div className="flex items-center"><PieChartIcon className="mr-2 h-4 w-4" />Pie Chart</div>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -520,3 +553,5 @@ export function CashBookPage() {
     </>
   );
 }
+
+    
