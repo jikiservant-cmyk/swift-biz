@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   User as UserIcon,
+  Calculator,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,6 +38,7 @@ const menuItems = [
   { href: "/tasks", label: "Tasks", icon: ClipboardList },
   { href: "/financials", label: "Financials", icon: DollarSign },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/cash-book", label: "Cash Book", icon: Calculator },
 ];
 
 export function AppSidebar() {
