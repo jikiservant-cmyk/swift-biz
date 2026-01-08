@@ -30,6 +30,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+      // Extend the server action timeout to 2 minutes for SMS sending
+      serverActionsTimeout: 120,
+    },
+  },
 };
 
 export default nextConfig;

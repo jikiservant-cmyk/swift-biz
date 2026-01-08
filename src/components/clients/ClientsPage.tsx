@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
+import { sendSms } from '@/ai/flows/send-sms-flow';
 
 export function ClientsPage() {
   const { firestore, user } = useFirebase();
@@ -40,6 +41,7 @@ export function ClientsPage() {
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isSmsDialogOpen, setIsSmsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isSendingSms, setIsSendingSms] = useState(false);
 
   const clientTasks = (clientId: string) => tasksWithDates.filter(t => t.clientId === clientId);
 
@@ -78,7 +80,7 @@ export function ClientsPage() {
     setEditingClient(null);
   };
 
-  const handleSendSms = (message: string) => {
+  const handleSendSms = async (message: string) => {
     if (!clients || clients.length === 0) {
       toast({
         title: 'No clients to message',
@@ -88,18 +90,30 @@ export function ClientsPage() {
       return;
     }
     
-    console.log(`--- Sending ${clients.length} personalized messages ---`);
-    clients.forEach(client => {
+    setIsSendingSms(true);
+    try {
+      const smsPromises = clients.map(client => {
         const personalizedMessage = message.replace(/{{clientName}}/g, client.name);
-        console.log(`To: ${client.phone} | Message: "${personalizedMessage}"`);
-    });
-    console.log(`---------------------------------------------`);
-
-    toast({
-      title: 'SMS Sent (Simulated)',
-      description: `Your personalized message has been sent to ${clients.length} clients. Check the console for details.`,
-    });
-    setIsSmsDialogOpen(false);
+        return sendSms({ to: client.phone, body: personalizedMessage });
+      });
+      
+      await Promise.all(smsPromises);
+      
+      toast({
+        title: 'Bulk SMS Sent',
+        description: `Your message has been sent to ${clients.length} clients.`,
+      });
+    } catch (error) {
+      console.error('Failed to send one or more SMS messages', error);
+      toast({
+        title: 'SMS Sending Error',
+        description: 'Could not send all messages. Please check your configuration and try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingSms(false);
+      setIsSmsDialogOpen(false);
+    }
   };
 
   return (
@@ -150,7 +164,7 @@ export function ClientsPage() {
 
       <ClientFormDialog isOpen={isClientDialogOpen} setIsOpen={setIsClientDialogOpen} onSave={handleSaveClient} client={editingClient} />
 
-      <BulkSmsDialog isOpen={isSmsDialogOpen} setIsOpen={setIsSmsDialogOpen} onSend={handleSendSms} />
+      <BulkSmsDialog isOpen={isSmsDialogOpen} setIsOpen={setIsSmsDialogOpen} onSend={handleSendSms} isSending={isSendingSms} />
 
       <Sheet open={!!selectedClient} onOpenChange={open => !open && setSelectedClient(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -278,7 +292,7 @@ function ClientFormDialog({ isOpen, setIsOpen, onSave, client }: { isOpen: boole
   );
 }
 
-function BulkSmsDialog({ isOpen, setIsOpen, onSend }: { isOpen: boolean; setIsOpen: (open: boolean) => void; onSend: (message: string) => void }) {
+function BulkSmsDialog({ isOpen, setIsOpen, onSend, isSending }: { isOpen: boolean; setIsOpen: (open: boolean) => void; onSend: (message: string) => void, isSending: boolean }) {
   const [message, setMessage] = useState('');
 
   React.useEffect(() => {
@@ -308,12 +322,11 @@ function BulkSmsDialog({ isOpen, setIsOpen, onSend }: { isOpen: boolean; setIsOp
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSend} disabled={!message.trim()}>
-            Send Message
+          <Button onClick={handleSend} disabled={!message.trim() || isSending}>
+            {isSending ? 'Sending...' : 'Send Message'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-    
