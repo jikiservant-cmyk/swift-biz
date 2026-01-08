@@ -1,0 +1,463 @@
+{
+  "entities": {
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task within the SwiftBiz application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the task."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the task."
+        },
+        "assigneeId": {
+          "type": "string",
+          "description": "Reference to User assigned to this task. (Relationship: User 1:N Task)"
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Due date for the task.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the task (e.g., 'Open', 'InProgress', 'Completed')."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the Client associated with this task. (Relationship: Client 1:N Task)"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "assigneeId",
+        "dueDate",
+        "status"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user within the SwiftBiz application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email"
+      ]
+    },
+    "Income": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Income",
+      "type": "object",
+      "description": "Represents an income record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Income entity."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of income received."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date the income was received.",
+          "format": "date-time"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category for income categorization. (Relationship: Category 1:N Income)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the income source."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the Client associated with this income. (Relationship: Client 1:N Income)"
+        }
+      },
+      "required": [
+        "id",
+        "amount",
+        "date",
+        "categoryId"
+      ]
+    },
+    "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Expense",
+      "type": "object",
+      "description": "Represents an expense record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of expense incurred."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date the expense was incurred.",
+          "format": "date-time"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category for expense categorization. (Relationship: Category 1:N Expense)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the expense."
+        }
+      },
+      "required": [
+        "id",
+        "amount",
+        "date",
+        "categoryId"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a category for income and expenses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the category (e.g., 'Salary', 'Rent', 'Utilities')."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of category ('Income' or 'Expense')."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type"
+      ]
+    },
+    "Client": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Client",
+      "type": "object",
+      "description": "Represents a client.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Client entity."
+        },
+        "contactInfo": {
+          "type": "string",
+          "description": "Contact information for the client."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes about the client."
+        }
+      },
+      "required": [
+        "id",
+        "contactInfo"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Represents a payment record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the Client who made the payment. (Relationship: Client 1:N Payment)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the payment.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Payment amount."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the payment."
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "date",
+        "amount"
+      ]
+    },
+    "Alert": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Alert",
+      "type": "object",
+      "description": "Represents a system alert.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Alert entity."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of alert (e.g., 'Low Cash', 'Overdue Tasks')."
+        },
+        "message": {
+          "type": "string",
+          "description": "Message content of the alert."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date the alert was generated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "message",
+        "date"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. User ID is the Firebase Auth UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Firebase Auth UID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Stores tasks associated with a specific user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Firebase Auth UID of the user."
+            },
+            {
+              "name": "taskId",
+              "description": "Unique identifier for the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores categories for income and expenses.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "Unique identifier for the category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}",
+        "definition": {
+          "entityName": "Client",
+          "schema": {
+            "$ref": "#/backend/entities/Client"
+          },
+          "description": "Stores client information. Includes a 'members' map for authorization.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "Unique identifier for the client."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Stores tasks associated with a client. Includes denormalized 'members' map for authorization independence.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "Unique identifier for the client."
+            },
+            {
+              "name": "taskId",
+              "description": "Unique identifier for the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Stores payment records for a client. Includes denormalized 'members' map for authorization independence.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "Unique identifier for the client."
+            },
+            {
+              "name": "paymentId",
+              "description": "Unique identifier for the payment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}/incomes/{incomeId}",
+        "definition": {
+          "entityName": "Income",
+          "schema": {
+            "$ref": "#/backend/entities/Income"
+          },
+          "description": "Stores income records associated with a client. Includes denormalized 'members' map for authorization independence.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "Unique identifier for the client."
+            },
+            {
+              "name": "incomeId",
+              "description": "Unique identifier for the income record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/alerts/{alertId}",
+        "definition": {
+          "entityName": "Alert",
+          "schema": {
+            "$ref": "#/backend/entities/Alert"
+          },
+          "description": "Stores system alerts.",
+          "params": [
+            {
+              "name": "alertId",
+              "description": "Unique identifier for the alert."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Expense",
+          "schema": {
+            "$ref": "#/backend/entities/Expense"
+          },
+          "description": "Stores expense records for a user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Firebase Auth UID of the user."
+            },
+            {
+              "name": "expenseId",
+              "description": "Unique identifier for the expense."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/incomes/{incomeId}",
+        "definition": {
+          "entityName": "Income",
+          "schema": {
+            "$ref": "#/backend/entities/Income"
+          },
+          "description": "Stores income records for a user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Firebase Auth UID of the user."
+            },
+            {
+              "name": "incomeId",
+              "description": "Unique identifier for the income."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the SwiftBiz application, focusing on task management, financial tracking, and client management. It prioritizes authorization independence and simple, robust security rules.  \n\nUser-owned data (Tasks, Incomes, Expenses, Payments) are stored under the `/users/{userId}` path to ensure clear ownership and simplified security rules.\n\nClients are stored in a top-level collection `/clients/{clientId}`. Authorization is handled via a `members` map within each client document. This `members` map is denormalized into related subcollections (tasks, payments, incomes) to ensure authorization independence.\n\nCategories are stored in a top-level collection `/categories/{categoryId}` as they are global and not user-specific.  \n\nAlerts are stored in a top-level collection `/alerts/{alertId}`. Security will rely on a separate process (e.g., Cloud Function) to manage alert creation and potentially restrict read access.\n\n**Authorization Independence:** The `members` map in the `/clients/{clientId}` document is copied into each document within the `/clients/{clientId}/tasks`, `/clients/{clientId}/incomes`, and `/clients/{clientId}/payments` subcollections. This denormalization ensures that security rules for these subcollections do not need to perform `get()` operations on the parent `client` document, maintaining atomic operations and simplifying security rule logic.\n\n**QAPs (Rules are not Filters):** The structure supports secure `list` operations by segregating data based on ownership and access control. User-specific data is stored under `/users/{userId}`, allowing easy filtering based on the authenticated user ID. The `members` map facilitates collaborative access control for client-related data, ensuring only authorized users can list and access data within the corresponding subcollections. The global `categories` collection and `alerts` collections may require additional constraints in security rules to prevent unauthorized access depending on the application's specific requirements."
+  }
+}

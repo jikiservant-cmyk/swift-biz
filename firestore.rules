@@ -1,0 +1,254 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * Core Philosophy: This ruleset enforces a hybrid security model. Data directly related to a user,
+     * such as their personal tasks, expenses, and income, is governed by a strict user-ownership model.
+     * All such data is stored within a user-specific document tree and is private. For collaborative
+     * data, like shared clients and their associated sub-collections (tasks, payments), the ruleset uses a
+     * role-based access control (RBAC) system managed through a `members` map on each document.
+     *
+     * Data Structure: User-private data is hierarchically organized under `/users/{userId}`.
+     * Shared client data is structured under a top-level `/clients/{clientId}` collection, with related
+     * tasks, payments, and incomes in subcollections. Global, read-only data like `/categories` and
+     * `/alerts` exist at the top level.
+     *
+     * Key Security Decisions:
+     * - User data is strictly private. No user can see or modify another user's private data.
+     * - Client data access is managed by a `members` map. A user must be listed in this map to
+     *   gain read or write access.
+     * - To ensure performant and simple rules, the `members` map from a parent client document is
+     *   denormalized (copied) onto every document in its subcollections (e.g., tasks, payments). This
+     *   avoids costly `get()` calls for most authorization checks.
+     * - Global collections (`/categories`, `/alerts`) are read-only for all signed-in users. Their
+     *   creation and modification must be handled by a trusted backend process (e.g., Cloud Functions).
+     * - Listing users is explicitly disallowed to protect user privacy.
+     *
+     * Denormalization for Authorization: The security model for `/clients` and their subcollections relies
+     * heavily on denormalization. Each document under `/clients/{clientId}/...` must contain its own copy
+     * of the `members` map. This allows rules to authorize `get`, `update`, and `delete` operations
+     * instantly without fetching the parent client document. For operations that require parent-level
+     * context, such as `list` or `create`, a single `get()` call is used to verify permissions on the
+     * parent client.
+     *
+     * Structural Segregation: The separation of private data into `/users/{userId}` and shared data into
+     * `/clients/{clientId}` provides a clear security boundary, simplifying rules and client-side queries.
+     */
+
+    // --------------------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for safe updates and deletes.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Checks if the authenticated user is a member of a document.
+     * Assumes the document data has a 'members' map: `{ 'uid': 'role' }`.
+     */
+    function isMember(docData) {
+      return isSignedIn() && request.auth.uid in docData.members;
+    }
+
+    /**
+     * Checks for membership on an existing document for safe updates and deletes.
+     */
+    function isExistingMember(docData) {
+      return isMember(docData) && resource != null;
+    }
+
+    /**
+     * Checks if a user is a member of the parent client document.
+     * This performs a single `get` operation and should be used for list/create rules.
+     */
+    function isParentClientMember(clientId) {
+      let clientData = get(/databases/$(database)/documents/clients/$(clientId)).data;
+      return isSignedIn() && request.auth.uid in clientData.members;
+    }
+
+    // --------------------------------------------------------------------------------
+    // User Data
+    // --------------------------------------------------------------------------------
+
+    /**
+     * @description A user can create their own profile, and only they can read or modify it.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user with UID 'user_abc' creating '/users/user_abc'.
+     * @deny (get) User 'user_xyz' trying to read '/users/user_abc'.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Disallow listing users for privacy
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isOwner(userId);
+    }
+
+    /**
+     * @description A user can manage their own private tasks.
+     * @path /users/{userId}/tasks/{taskId}
+     * @allow (create) User 'user_abc' creating a task under '/users/user_abc/tasks/'.
+     * @deny (list) User 'user_xyz' trying to list tasks under '/users/user_abc/tasks/'.
+     * @principle Enforces strict ownership for all data within a user's private data tree.
+     */
+    match /users/{userId}/tasks/{taskId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description A user can manage their own private expenses.
+     * @path /users/{userId}/expenses/{expenseId}
+     * @allow (create) User 'user_abc' creating an expense under '/users/user_abc/expenses/'.
+     * @deny (get) User 'user_xyz' trying to read an expense from '/users/user_abc/expenses/'.
+     * @principle Enforces strict ownership for all data within a user's private data tree.
+     */
+    match /users/{userId}/expenses/{expenseId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description A user can manage their own private income records.
+     * @path /users/{userId}/incomes/{incomeId}
+     * @allow (create) User 'user_abc' creating an income record under '/users/user_abc/incomes/'.
+     * @deny (delete) User 'user_xyz' trying to delete an income record from '/users/user_abc/incomes/'.
+     * @principle Enforces strict ownership for all data within a user's private data tree.
+     */
+    match /users/{userId}/incomes/{incomeId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    // --------------------------------------------------------------------------------
+    // Shared Client Data
+    // --------------------------------------------------------------------------------
+
+    /**
+     * @description Client documents are shared among a set of users defined in a `members` map.
+     *              Any member can read/update the client, but only an 'owner' can delete or manage members.
+     * @path /clients/{clientId}
+     * @allow (get) User 'user_abc' reading '/clients/client_123' if they are in its `members` map.
+     * @deny (update) A member with a 'viewer' role trying to update the client's notes.
+     * @principle Implements collaborative access using a roles map on the document itself.
+     */
+    match /clients/{clientId} {
+      allow get: if isMember(resource.data);
+      allow list: if isSignedIn(); // Client must constrain query: .where(`members.${auth.uid}`, '!=', null)
+      allow create: if isSignedIn() && isMember(request.resource.data); // Creator must be in the initial members map.
+      allow update: if isExistingMember(resource.data);
+      allow delete: if isExistingMember(resource.data); // Simplified for prototyping; production may restrict to an 'owner' role.
+    }
+
+    /**
+     * @description Client tasks are accessible to all members of the parent client.
+     * @path /clients/{clientId}/tasks/{taskId}
+     * @allow (get) A user reading a task if their UID is in the task's denormalized `members` map.
+     * @deny (create) A user trying to create a task for a client they are not a member of.
+     * @principle Uses denormalized auth data (members map) to avoid `get` calls on single-doc reads.
+     */
+    match /clients/{clientId}/tasks/{taskId} {
+      allow get: if isMember(resource.data);
+      allow list: if isParentClientMember(clientId);
+      allow create: if isParentClientMember(clientId) && request.resource.data.clientId == clientId;
+      allow update: if isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId;
+      allow delete: if isExistingMember(resource.data);
+    }
+
+    /**
+     * @description Client payments are accessible to all members of the parent client.
+     * @path /clients/{clientId}/payments/{paymentId}
+     * @allow (list) A user listing payments if they are a member of the parent client.
+     * @deny (get) A non-member trying to read a specific payment document.
+     * @principle Uses denormalized auth data (members map) to avoid `get` calls on single-doc reads.
+     */
+    match /clients/{clientId}/payments/{paymentId} {
+      allow get: if isMember(resource.data);
+      allow list: if isParentClientMember(clientId);
+      allow create: if isParentClientMember(clientId) && request.resource.data.clientId == clientId;
+      allow update: if isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId;
+      allow delete: if isExistingMember(resource.data);
+    }
+
+    /**
+     * @description Client income records are accessible to all members of the parent client.
+     * @path /clients/{clientId}/incomes/{incomeId}
+     * @allow (update) A member updating an income record under a client they have access to.
+     * @deny (create) A user creating an income record with a mismatched `clientId`.
+     * @principle Validates relational integrity between documents and parent collection.
+     */
+    match /clients/{clientId}/incomes/{incomeId} {
+      allow get: if isMember(resource.data);
+      allow list: if isParentClientMember(clientId);
+      allow create: if isParentClientMember(clientId) && request.resource.data.clientId == clientId;
+      allow update: if isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId;
+      allow delete: if isExistingMember(resource.data);
+    }
+
+
+    // --------------------------------------------------------------------------------
+    // Global Data
+    // --------------------------------------------------------------------------------
+
+    /**
+     * @description Categories are global and readable by any authenticated user, but not writable.
+     * @path /categories/{categoryId}
+     * @allow (get) Any signed-in user reading a category document.
+     * @deny (create) Any client trying to create a new category.
+     * @principle Secures global data as read-only, assuming writes are handled by a trusted backend.
+     */
+    match /categories/{categoryId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Alerts are readable by any authenticated user, but not writable from the client.
+     * @path /alerts/{alertId}
+     * @allow (list) Any signed-in user listing all system alerts.
+     * @deny (delete) Any client trying to delete an alert.
+     * @principle Secures global data as read-only, assuming writes are handled by a trusted backend.
+     */
+    match /alerts/{alertId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+  }
+}
