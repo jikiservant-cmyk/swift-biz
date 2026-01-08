@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { AuthWrapper } from '@/components/AuthWrapper';
 
 export const metadata: Metadata = {
   title: 'Mubiru Farm',
@@ -26,12 +25,9 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <SidebarProvider>
-            <AppSidebar />
-            <SidebarInset>
-              {children}
-            </SidebarInset>
-          </SidebarProvider>
+          <AuthWrapper>
+            {children}
+          </AuthWrapper>
         </FirebaseClientProvider>
         <Toaster />
       </body>

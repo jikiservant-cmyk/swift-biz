@@ -33,6 +33,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { useFirebase } from "@/firebase";
+import { getAuth } from "firebase/auth";
 
 const menuItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -44,6 +46,15 @@ const menuItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { user } = useFirebase();
+
+  const handleLogout = () => {
+    getAuth().signOut();
+  };
+
+  const userDisplayName = user?.isAnonymous ? 'Anonymous' : user?.email || 'Admin User';
+  const userAvatarFallback = user?.isAnonymous ? 'A' : user?.email?.charAt(0).toUpperCase() || 'AU';
+
 
   return (
     <Sidebar collapsible="icon">
@@ -81,10 +92,10 @@ export function AppSidebar() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton tooltip="Account" className="w-full">
               <Avatar className="w-6 h-6">
-                <AvatarImage src="https://picsum.photos/seed/user-main/40/40" alt="Admin User" />
-                <AvatarFallback>AU</AvatarFallback>
+                <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/40/40`} alt={userDisplayName} />
+                <AvatarFallback>{userAvatarFallback}</AvatarFallback>
               </Avatar>
-              <span className="truncate">Admin User</span>
+              <span className="truncate">{userDisplayName}</span>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 mb-2" side="right" align="end">
@@ -99,7 +110,7 @@ export function AppSidebar() {
               <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
