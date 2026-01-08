@@ -59,12 +59,17 @@ export function ClientsPage() {
       toast({ title: 'Client updated' });
     } else {
       // Creating
-      const clientPayload = { 
+      const clientPayload: any = { 
         ...clientData, 
         members: {
             [user.uid]: 'owner'
         }
       };
+      // Firestore's addDoc fails if an 'id' field is present but undefined.
+      // When creating a new document, we must remove it.
+      if (!clientPayload.id) {
+          delete clientPayload.id;
+      }
       const clientsCol = collection(firestore, 'clients');
       addDocumentNonBlocking(clientsCol, clientPayload);
       toast({ title: 'Client added' });
