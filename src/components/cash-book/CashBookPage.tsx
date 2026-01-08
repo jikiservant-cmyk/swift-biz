@@ -3,74 +3,93 @@
 import React, { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Calculator } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus } from "lucide-react";
 
 export function CashBookPage() {
-  const { toast } = useToast();
-  const [calculation, setCalculation] = useState("");
-  const [result, setResult] = useState<number | null>(null);
+  const [headers, setHeaders] = useState(["Header 1", "Header 2", "Header 3"]);
+  const [gridData, setGridData] = useState([
+    ["", "", ""],
+    ["", "", ""],
+    ["", "", ""],
+  ]);
 
-  const handleCalculate = () => {
-    try {
-      // Basic validation to prevent unsafe evaluation
-      if (!/^[0-9+\-*/.\s()]*$/.test(calculation)) {
-        throw new Error("Invalid characters in calculation.");
-      }
-      // WARNING: Using eval is generally unsafe. This is a simple implementation
-      // for demonstration purposes. In a real app, you'd use a proper math expression parser.
-      const calculatedResult = eval(calculation);
-      setResult(calculatedResult);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Calculation Error",
-        description: "Please enter a valid mathematical expression.",
-      });
-      setResult(null);
-    }
+  const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement>, colIndex: number) => {
+    const newHeaders = [...headers];
+    newHeaders[colIndex] = e.target.value;
+    setHeaders(newHeaders);
+  };
+
+  const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
+    const newData = [...gridData];
+    newData[rowIndex][colIndex] = e.target.value;
+    setGridData(newData);
+  };
+
+  const addRow = () => {
+    setGridData([...gridData, Array(headers.length).fill("")]);
+  };
+
+  const addColumn = () => {
+    setHeaders([...headers, `Header ${headers.length + 1}`]);
+    setGridData(gridData.map(row => [...row, ""]));
   };
 
   return (
     <>
       <PageHeader title="Cash Book" />
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Calculator</CardTitle>
-            <CardDescription>Enter a mathematical expression to calculate.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="e.g., (150 + 25) * 2 - 50"
-              value={calculation}
-              onChange={(e) => setCalculation(e.target.value)}
-              rows={5}
-            />
-            <Button onClick={handleCalculate}>
-              <Calculator className="mr-2 h-4 w-4" />
-              Calculate
+      <Card>
+        <CardHeader>
+          <CardTitle>Data Grid</CardTitle>
+          <CardDescription>An editable grid for your cash book data. Add rows and columns as needed.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 mb-4">
+            <Button onClick={addRow}>
+              <Plus className="mr-2 h-4 w-4" /> Add Row
             </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Result</CardTitle>
-            <CardDescription>The result of your calculation will appear here.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex h-32 items-center justify-center rounded-md border border-dashed">
-              {result !== null ? (
-                <p className="text-4xl font-bold">{result.toLocaleString()}</p>
-              ) : (
-                <p className="text-muted-foreground">Awaiting calculation...</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Button onClick={addColumn} variant="outline">
+              <Plus className="mr-2 h-4 w-4" /> Add Column
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {headers.map((header, colIndex) => (
+                    <TableHead key={colIndex}>
+                       <Input
+                        type="text"
+                        value={header}
+                        onChange={(e) => handleHeaderChange(e, colIndex)}
+                        className="font-bold"
+                      />
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {gridData.map((row, rowIndex) => (
+                  <TableRow key={rowIndex}>
+                    {row.map((cell, colIndex) => (
+                      <TableCell key={colIndex}>
+                        <Input
+                          type="text"
+                          value={cell}
+                          onChange={(e) => handleCellChange(e, rowIndex, colIndex)}
+                          placeholder="Enter data..."
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </>
   );
 }
