@@ -226,5 +226,3 @@ function TransactionFormDialog({ state, setState, onSave }: { state: Transaction
     </Dialog>
   );
 }
-
-    
