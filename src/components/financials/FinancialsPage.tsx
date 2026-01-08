@@ -5,7 +5,7 @@ import React, { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowUpRight, ArrowDownLeft, FileDown, MoreHorizontal, Edit, Trash } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection, doc, Timestamp } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 
 type TransactionDialogState = {
@@ -70,7 +71,7 @@ export function FinancialsPage() {
     setDialogState({ isOpen: true, type, editingTransaction: transaction });
   };
   
-  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date'> & { id?: string, date?: Date }) => {
+  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date' | 'userId'> & { id?: string, date?: Date }) => {
     if (!firestore || !user) return;
     
     const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
@@ -101,6 +102,14 @@ export function FinancialsPage() {
     deleteDocumentNonBlocking(txRef);
     toast({ title: "Transaction deleted", variant: "destructive", description: "The transaction has been removed." });
   };
+
+  const chartData = [
+    {
+      name: 'Monthly Summary',
+      Income: monthlyIncome,
+      Expenses: monthlyExpenses,
+    },
+  ];
 
   return (
     <>
@@ -136,6 +145,33 @@ export function FinancialsPage() {
           <CardContent><div className="text-2xl font-bold">{formatCurrency(netIncome)}</div></CardContent>
         </Card>
       </div>
+      
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Monthly Summary</CardTitle>
+          <CardDescription>A visual comparison of your income and expenses for the current month.</CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
+              <Tooltip 
+                contentStyle={{ 
+                    background: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))"
+                }}
+                formatter={(value: number) => formatCurrency(value)}
+              />
+              <Legend />
+              <Bar dataKey="Income" fill="#22c55e" />
+              <Bar dataKey="Expenses" fill="#ef4444" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList><TabsTrigger value="income">Income</TabsTrigger><TabsTrigger value="expense">Expenses</TabsTrigger></TabsList>
