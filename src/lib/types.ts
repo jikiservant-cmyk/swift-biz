@@ -40,3 +40,11 @@ export type UnpaidInvoice = {
   amount: number;
   dueDate: Date;
 };
+
+export type CashBook = {
+  id: string;
+  headers: string[];
+  gridData: string[][];
+};
+
+    

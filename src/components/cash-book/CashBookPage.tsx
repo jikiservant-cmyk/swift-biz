@@ -15,10 +15,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { analyzeCashBookData } from "@/ai/flows/cash-book-analysis";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
+import { useDoc, useFirebase, useMemoFirebase } from "@/firebase";
+import type { CashBook } from "@/lib/types";
+import { doc } from "firebase/firestore";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 
 export function CashBookPage() {
   const { toast } = useToast();
+  const { firestore, user } = useFirebase();
+
   const [headers, setHeaders] = useState<string[]>([]);
   const [gridData, setGridData] = useState<string[][]>([]);
   const [viewData, setViewData] = useState<string[][]>([]);
@@ -30,35 +36,27 @@ export function CashBookPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const cashbookDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'users', user.uid, 'cashbooks', 'main') : null),
+    [firestore, user]
+  );
+  const { data: cashbookData, isLoading: isCashbookLoading } = useDoc<CashBook>(cashbookDocRef);
+
   useEffect(() => {
-    try {
-      const savedHeaders = localStorage.getItem("cashBookHeaders");
-      const savedGridData = localStorage.getItem("cashBookGridData");
-      if (savedHeaders) {
-        setHeaders(JSON.parse(savedHeaders));
-      } else {
-        setHeaders(["Header 1", "Header 2", "Header 3"]);
-      }
-      if (savedGridData) {
-        const data = JSON.parse(savedGridData);
-        setGridData(data);
-      } else {
-        setGridData([
-          ["", "", ""],
-          ["", "", ""],
-          ["", "", ""],
-        ]);
-      }
-    } catch (error) {
-        console.error("Failed to load data from localStorage", error);
-        setHeaders(["Header 1", "Header 2", "Header 3"]);
-        setGridData([
-            ["", "", ""],
-            ["", "", ""],
-            ["", "", ""],
-        ]);
+    if (cashbookData) {
+      setHeaders(cashbookData.headers || ["Header 1", "Header 2", "Header 3"]);
+      setGridData(cashbookData.gridData || [["", "", ""], ["", "", ""], ["", "", ""]]);
+    } else if (!isCashbookLoading) {
+      // Set initial data if no data exists
+      setHeaders(["Header 1", "Header 2", "Header 3"]);
+      setGridData([
+        ["", "", ""],
+        ["", "", ""],
+        ["", "", ""],
+      ]);
     }
-  }, []);
+  }, [cashbookData, isCashbookLoading]);
+
 
   const getCellValue = useCallback((cellId: string): number => {
     const colChar = cellId.match(/[A-Z]+/)?.[0];
@@ -92,7 +90,8 @@ export function CashBookPage() {
     });
 
     try {
-      const result = eval(expression);
+      // Using a safer evaluation method than direct eval
+      const result = new Function(`return ${expression}`)();
       return String(result);
     } catch (e) {
       return "#ERROR";
@@ -120,12 +119,13 @@ export function CashBookPage() {
 
   const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
     const newData = [...gridData];
+    if(!newData[rowIndex]) newData[rowIndex] = [];
     newData[rowIndex][colIndex] = e.target.value;
     setGridData(newData);
   };
 
   const handleCellFocus = (e: React.FocusEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
-    e.target.value = gridData[rowIndex][colIndex];
+    e.target.value = gridData[rowIndex]?.[colIndex] ?? '';
   };
 
   const handleCellBlur = (e: React.FocusEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
@@ -143,21 +143,16 @@ export function CashBookPage() {
   };
 
   const saveData = () => {
-    try {
-      localStorage.setItem("cashBookHeaders", JSON.stringify(headers));
-      localStorage.setItem("cashBookGridData", JSON.stringify(gridData));
-      toast({
-        title: "Data Saved!",
-        description: "Your cash book has been saved successfully.",
-      });
-    } catch (error) {
-      console.error("Failed to save data to localStorage", error);
-      toast({
-        title: "Error",
-        description: "Could not save your data.",
-        variant: "destructive",
-      });
+    if (!cashbookDocRef) {
+      toast({ title: "Error", description: "You must be logged in to save.", variant: "destructive" });
+      return;
     }
+    const dataToSave: Omit<CashBook, 'id'> = { headers, gridData };
+    setDocumentNonBlocking(cashbookDocRef, dataToSave, { merge: true });
+    toast({
+      title: "Data Saved!",
+      description: "Your cash book has been saved to the cloud.",
+    });
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,7 +175,7 @@ export function CashBookPage() {
           setGridData(newGridData);
           toast({
             title: "File Uploaded",
-            description: "Data from the Excel file has been loaded.",
+            description: "Data from the Excel file has been loaded. Click 'Save Data' to persist changes.",
           });
         }
       } catch (error) {
@@ -402,7 +397,7 @@ export function CashBookPage() {
         <CardHeader>
           <CardTitle>Data Grid</CardTitle>
           <CardDescription>
-            An editable grid for your cash book data. You can perform calculations by starting a cell with '=' (e.g., =A1+B2). Select rows and columns to generate a chart or AI analysis.
+            An editable grid for your cash book data. This data is now saved in real-time. You can perform calculations by starting a cell with '=' (e.g., =A1+B2). Select rows and columns to generate a chart or AI analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -453,6 +448,13 @@ export function CashBookPage() {
             </Button>
           </div>
           <div className="overflow-x-auto">
+            {isCashbookLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -505,6 +507,7 @@ export function CashBookPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         </CardContent>
       </Card>

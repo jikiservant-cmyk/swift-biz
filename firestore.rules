@@ -119,6 +119,21 @@ service cloud.firestore {
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
+    
+    /**
+     * @description A user can manage their own cash book.
+     * @path /users/{userId}/cashbooks/{cashbookId}
+     * @allow (create) User 'user_abc' creating a cashbook under '/users/user_abc/cashbooks/'.
+     * @deny (list) User 'user_xyz' trying to list cashbooks under '/users/user_abc/cashbooks/'.
+     * @principle Enforces strict ownership for all data within a user's private data tree.
+     */
+    match /users/{userId}/cashbooks/{cashbookId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
 
     /**
      * @description A user can manage their own private expenses.
@@ -252,3 +267,4 @@ service cloud.firestore {
 
   }
 }
+    
