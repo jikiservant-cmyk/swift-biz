@@ -75,10 +75,17 @@ export function ClientsPage() {
       });
       return;
     }
-    console.log(`Sending SMS: "${message}" to ${clients.length} clients.`);
+    
+    console.log(`--- Sending ${clients.length} personalized messages ---`);
+    clients.forEach(client => {
+        const personalizedMessage = message.replace(/{{clientName}}/g, client.name);
+        console.log(`To: ${client.phone} | Message: "${personalizedMessage}"`);
+    });
+    console.log(`---------------------------------------------`);
+
     toast({
       title: 'SMS Sent (Simulated)',
-      description: `Your message has been sent to ${clients.length} clients.`,
+      description: `Your personalized message has been sent to ${clients.length} clients. Check the console for details.`,
     });
     setIsSmsDialogOpen(false);
   };
@@ -264,7 +271,7 @@ function BulkSmsDialog({ isOpen, setIsOpen, onSend }: { isOpen: boolean; setIsOp
 
   React.useEffect(() => {
     if (isOpen) {
-      setMessage('');
+      setMessage('Hello {{clientName}}, ');
     }
   }, [isOpen]);
 
@@ -277,7 +284,9 @@ function BulkSmsDialog({ isOpen, setIsOpen, onSend }: { isOpen: boolean; setIsOp
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Send Bulk SMS</DialogTitle>
-          <DialogDescription>Compose a message to send to all your clients.</DialogDescription>
+          <DialogDescription>
+            Compose a message to send to all your clients. Use the {'{{clientName}}'} placeholder to insert the client's name.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <Label htmlFor="message">Message</Label>
