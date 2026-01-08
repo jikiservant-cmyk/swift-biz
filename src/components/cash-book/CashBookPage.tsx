@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Save, BarChart } from "lucide-react";
+import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 export function CashBookPage() {
@@ -21,6 +22,7 @@ export function CashBookPage() {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [selectedCols, setSelectedCols] = useState<Set<number>>(new Set());
   const [chartData, setChartData] = useState<any[]>([]);
+  const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
 
   useEffect(() => {
     try {
@@ -215,6 +217,59 @@ export function CashBookPage() {
       return selCols.slice(1).map(colIndex => headers[colIndex] || `Column ${colIndex + 1}`);
   }, [selectedCols, headers]);
 
+  const renderChart = () => {
+    const commonProps = {
+        data: chartData,
+        margin: { top: 20, right: 30, left: 20, bottom: 5 },
+    };
+    const commonComps = (
+      <>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="name" />
+        <YAxis />
+        <Tooltip 
+            contentStyle={{ 
+                background: "hsl(var(--background))",
+                border: "1px solid hsl(var(--border))"
+            }}
+        />
+        <Legend />
+      </>
+    );
+    
+    switch(chartType) {
+        case 'bar':
+            return (
+                <RechartsBarChart {...commonProps}>
+                    {commonComps}
+                    {selectedDataHeaders.map((header, index) => (
+                      <Bar key={header} dataKey={header} fill={chartColors[index % chartColors.length]} />
+                    ))}
+                </RechartsBarChart>
+            );
+        case 'line':
+            return (
+                <LineChart {...commonProps}>
+                    {commonComps}
+                    {selectedDataHeaders.map((header, index) => (
+                      <Line key={header} type="monotone" dataKey={header} stroke={chartColors[index % chartColors.length]} />
+                    ))}
+                </LineChart>
+            );
+        case 'area':
+            return (
+                <AreaChart {...commonProps}>
+                    {commonComps}
+                    {selectedDataHeaders.map((header, index) => (
+                      <Area key={header} type="monotone" dataKey={header} stroke={chartColors[index % chartColors.length]} fill={chartColors[index % chartColors.length]} fillOpacity={0.3} />
+                    ))}
+                </AreaChart>
+            );
+        default:
+            return null;
+    }
+  };
+
 
   return (
     <>
@@ -240,6 +295,22 @@ export function CashBookPage() {
             <Button onClick={handleGenerateChart} variant="default">
               <BarChart className="mr-2 h-4 w-4" /> Generate Chart
             </Button>
+            <Select value={chartType} onValueChange={(value) => setChartType(value as any)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select chart type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bar">
+                  <div className="flex items-center"><BarChart className="mr-2 h-4 w-4" />Bar Chart</div>
+                </SelectItem>
+                <SelectItem value="line">
+                  <div className="flex items-center"><LineChartIcon className="mr-2 h-4 w-4" />Line Chart</div>
+                </SelectItem>
+                <SelectItem value="area">
+                   <div className="flex items-center"><AreaChartIcon className="mr-2 h-4 w-4" />Area Chart</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -303,26 +374,12 @@ export function CashBookPage() {
             <CardHeader>
                 <CardTitle>Chart Analysis</CardTitle>
                 <CardDescription>
-                    Bar chart of your selected data. The first selected column is used for labels, and subsequent selected columns are used for values.
+                    {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart of your selected data. The first selected column is used for labels, and subsequent selected columns are used for values.
                 </CardDescription>
             </CardHeader>
             <CardContent className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                    <RechartsBarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip 
-                            contentStyle={{ 
-                                background: "hsl(var(--background))",
-                                border: "1px solid hsl(var(--border))"
-                            }}
-                        />
-                        <Legend />
-                        {selectedDataHeaders.map((header, index) => (
-                          <Bar key={header} dataKey={header} fill={chartColors[index % chartColors.length]} />
-                        ))}
-                    </RechartsBarChart>
+                    {renderChart()}
                 </ResponsiveContainer>
             </CardContent>
         </Card>
