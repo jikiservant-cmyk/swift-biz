@@ -253,11 +253,16 @@ export function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients
   }, [task, isOpen]);
 
   const handleSubmit = () => {
-    const taskData: any = { id: task?.id, title, clientId, status, dueDate, userId: '' };
-    // Only include assigneeId if it's selected
+    const taskData: any = { id: task?.id, title, status, dueDate };
+    
+    // Only include assigneeId and clientId if they have a selected value
     if (assigneeId) {
       taskData.assigneeId = assigneeId;
     }
+    if (clientId) {
+      taskData.clientId = clientId;
+    }
+
     onSave(taskData);
   };
 
