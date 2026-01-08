@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, doc, Timestamp } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { users as staticUsers, clients as staticClients } from '@/lib/data'; // for dropdowns
+import { users as staticUsers } from '@/lib/data'; 
 
 type TaskFilter = 'all' | 'today' | 'overdue' | 'completed';
 
@@ -279,23 +279,6 @@ function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { i
             </Select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="assignee" className="text-right">
-              Assignee
-            </Label>
-            <Select value={assigneeId} onValueChange={setAssigneeId}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a user" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map(user => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="client" className="text-right">
               Client
             </Label>
@@ -329,12 +312,3 @@ function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { i
     </Dialog>
   );
 }
-
-// Remove the export that uses mock data
-// export default function Tasks() {
-//   return (
-//     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
-//       <TaskPage initialTasks={tasks} users={users} clients={clients} />
-//     </div>
-//   );
-// }
