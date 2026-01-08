@@ -247,7 +247,12 @@ function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { i
   }, [task, isOpen]);
 
   const handleSubmit = () => {
-    onSave({ id: task?.id, title, assigneeId, clientId, status, dueDate });
+    // Only include assigneeId if it has a value
+    const taskData: any = { id: task?.id, title, clientId, status, dueDate };
+    if (assigneeId) {
+      taskData.assigneeId = assigneeId;
+    }
+    onSave(taskData);
   };
 
   return (
@@ -275,6 +280,23 @@ function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { i
                 <SelectItem value="todo">To Do</SelectItem>
                 <SelectItem value="in-progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="assignee" className="text-right">
+              Assignee
+            </Label>
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Select an assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
