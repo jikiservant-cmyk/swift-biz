@@ -1,4 +1,7 @@
-import { Suspense } from "react";
+
+'use client';
+
+import { Suspense, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { AIAlerts } from "@/components/dashboard/AIAlerts";
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
@@ -6,16 +9,50 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { TaskFormDialog } from "@/components/tasks/TaskPage";
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { Client, Task, User } from "@/lib/types";
+import { users as staticUsers } from "@/lib/data";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { Timestamp } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const { firestore, user } = useFirebase();
+  const { toast } = useToast();
+
+  const clientsQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'clients') : null),
+    [firestore, user]
+  );
+  const { data: clients } = useCollection<Client>(clientsQuery);
+
+  const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
+    if (!firestore || !user) return;
+
+    // Creating a new task
+    const taskPayload = {
+      ...taskData,
+      dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
+      userId: user.uid,
+    };
+    const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
+    addDocumentNonBlocking(tasksCol, taskPayload);
+    toast({ title: 'Task created', description: 'A new task has been added to your list.' });
+    
+    setIsTaskDialogOpen(false);
+  };
+
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
       <PageHeader 
         title="Dashboard"
         actionButton={
-          <Button>
+          <Button onClick={() => setIsTaskDialogOpen(true)}>
             <Plus className="-ml-1 mr-2 h-4 w-4" />
-            Create New
+            Create New Task
           </Button>
         }
       />
@@ -26,6 +63,14 @@ export default function Home() {
       <div className="mt-8">
         <RecentActivity />
       </div>
+      <TaskFormDialog
+        isOpen={isTaskDialogOpen}
+        setIsOpen={setIsTaskDialogOpen}
+        onSave={handleSaveTask}
+        task={null}
+        users={staticUsers}
+        clients={clients || []}
+      />
     </div>
   );
 }

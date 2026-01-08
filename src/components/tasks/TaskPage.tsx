@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -227,7 +228,7 @@ const AssigneeAvatar = ({ assignee }: { assignee?: User }) => {
   );
 };
 
-function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { isOpen: boolean; setIsOpen: (open: boolean) => void; onSave: (data: any) => void; task: Task | null; users: User[]; clients: Client[] }) {
+export function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { isOpen: boolean; setIsOpen: (open: boolean) => void; onSave: (data: any) => void; task: Task | null; users: User[]; clients: Client[] }) {
   const [title, setTitle] = useState('');
   const [assigneeId, setAssigneeId] = useState<string | undefined>(undefined);
   const [clientId, setClientId] = useState<string | undefined>(undefined);
@@ -251,7 +252,7 @@ function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { i
   }, [task, isOpen]);
 
   const handleSubmit = () => {
-    const taskData: any = { id: task?.id, title, clientId, status, dueDate };
+    const taskData: any = { id: task?.id, title, clientId, status, dueDate, userId: '' };
     // Only include assigneeId if it's selected
     if (assigneeId) {
       taskData.assigneeId = assigneeId;
