@@ -1,19 +1,26 @@
+
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Save } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Save, BarChart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 
 export function CashBookPage() {
   const { toast } = useToast();
   const [headers, setHeaders] = useState<string[]>([]);
   const [gridData, setGridData] = useState<string[][]>([]);
   const [viewData, setViewData] = useState<string[][]>([]);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectedCols, setSelectedCols] = useState<Set<number>>(new Set());
+  const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
     try {
@@ -56,9 +63,8 @@ export function CashBookPage() {
 
     if (rowIndex >= 0 && rowIndex < gridData.length && colIndex >= 0 && colIndex < headers.length) {
       const cellValue = gridData[rowIndex][colIndex];
-      // Check for circular reference
       if (cellValue.startsWith('=')) {
-          return NaN; // Or handle error appropriately
+          return NaN; 
       }
       const num = parseFloat(cellValue);
       return isNaN(num) ? 0 : num;
@@ -72,15 +78,12 @@ export function CashBookPage() {
 
     let expression = formula.substring(1);
 
-    // Replace cell references (e.g., A1, B2) with their values
     expression = expression.replace(/[A-Z]+\d+/g, (match) => {
         const value = getCellValue(match);
         return isNaN(value) ? '0' : value.toString();
     });
 
     try {
-      // Be careful with eval. For a real app, use a safer expression parser.
-      // This is a simplified example.
       const result = eval(expression);
       return String(result);
     } catch (e) {
@@ -118,7 +121,7 @@ export function CashBookPage() {
   };
 
   const handleCellBlur = (e: React.FocusEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
-     e.target.value = viewData[rowIndex][colIndex];
+     e.target.value = viewData[rowIndex]?.[colIndex] ?? '';
   };
 
 
@@ -153,6 +156,66 @@ export function CashBookPage() {
       return String.fromCharCode('A'.charCodeAt(0) + index);
   }
 
+  const toggleRowSelection = (rowIndex: number) => {
+    const newSelection = new Set(selectedRows);
+    if (newSelection.has(rowIndex)) {
+      newSelection.delete(rowIndex);
+    } else {
+      newSelection.add(rowIndex);
+    }
+    setSelectedRows(newSelection);
+  };
+
+  const toggleColSelection = (colIndex: number) => {
+    const newSelection = new Set(selectedCols);
+    if (newSelection.has(colIndex)) {
+      newSelection.delete(colIndex);
+    } else {
+      newSelection.add(colIndex);
+    }
+    setSelectedCols(newSelection);
+  };
+
+  const handleGenerateChart = () => {
+    if (selectedRows.size === 0 || selectedCols.size < 2) {
+      toast({
+        title: "Not enough data selected",
+        description: "Please select at least one row and two columns (one for labels, one for values).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selCols = Array.from(selectedCols).sort((a, b) => a - b);
+    const labelColumnIndex = selCols[0];
+    const dataColumnIndices = selCols.slice(1);
+
+    const data = Array.from(selectedRows).map(rowIndex => {
+        const row = viewData[rowIndex];
+        const chartEntry: {[key: string]: string | number} = {
+            name: row[labelColumnIndex] || `Row ${rowIndex + 1}`
+        };
+
+        dataColumnIndices.forEach(colIndex => {
+            const header = headers[colIndex] || `Column ${colIndex + 1}`;
+            const value = parseFloat(row[colIndex]);
+            chartEntry[header] = isNaN(value) ? 0 : value;
+        });
+
+        return chartEntry;
+    });
+
+    setChartData(data);
+  };
+
+  const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F"], []);
+  const selectedDataHeaders = useMemo(() => {
+      if (selectedCols.size < 2) return [];
+      const selCols = Array.from(selectedCols).sort((a, b) => a - b);
+      return selCols.slice(1).map(colIndex => headers[colIndex] || `Column ${colIndex + 1}`);
+  }, [selectedCols, headers]);
+
+
   return (
     <>
       <PageHeader title="Cash Book" />
@@ -160,7 +223,7 @@ export function CashBookPage() {
         <CardHeader>
           <CardTitle>Data Grid</CardTitle>
           <CardDescription>
-            An editable grid for your cash book data. You can perform calculations by starting a cell with '=' (e.g., =A1+B2).
+            An editable grid for your cash book data. You can perform calculations by starting a cell with '=' (e.g., =A1+B2). Select rows and columns to generate a chart.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -171,24 +234,33 @@ export function CashBookPage() {
             <Button onClick={addColumn} variant="outline">
               <Plus className="mr-2 h-4 w-4" /> Add Column
             </Button>
-             <Button onClick={saveData} variant="secondary">
+            <Button onClick={saveData} variant="secondary">
               <Save className="mr-2 h-4 w-4" /> Save Data
+            </Button>
+            <Button onClick={handleGenerateChart} variant="default">
+              <BarChart className="mr-2 h-4 w-4" /> Generate Chart
             </Button>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                   <TableHead className="w-12"></TableHead>
+                   <TableHead className="w-12 sticky left-0 bg-card z-10"></TableHead>
                   {headers.map((header, colIndex) => (
-                    <TableHead key={colIndex}>
-                       <Input
-                        type="text"
-                        value={header}
-                        onChange={(e) => handleHeaderChange(e, colIndex)}
-                        className="font-bold text-center"
-                        placeholder={getColumnName(colIndex)}
-                      />
+                    <TableHead key={colIndex} className="text-center">
+                        <div className="flex items-center gap-2 justify-center">
+                         <Checkbox
+                            checked={selectedCols.has(colIndex)}
+                            onCheckedChange={() => toggleColSelection(colIndex)}
+                          />
+                         <Input
+                          type="text"
+                          value={header}
+                          onChange={(e) => handleHeaderChange(e, colIndex)}
+                          className="font-bold text-center"
+                          placeholder={getColumnName(colIndex)}
+                        />
+                      </div>
                     </TableHead>
                   ))}
                 </TableRow>
@@ -196,7 +268,15 @@ export function CashBookPage() {
               <TableBody>
                 {gridData.map((row, rowIndex) => (
                   <TableRow key={rowIndex}>
-                    <TableCell className="font-bold text-center text-muted-foreground">{rowIndex + 1}</TableCell>
+                    <TableCell className="font-bold text-center text-muted-foreground sticky left-0 bg-card z-10">
+                      <div className="flex items-center gap-2 justify-center">
+                        <Checkbox
+                          checked={selectedRows.has(rowIndex)}
+                          onCheckedChange={() => toggleRowSelection(rowIndex)}
+                        />
+                        {rowIndex + 1}
+                      </div>
+                    </TableCell>
                     {row.map((cell, colIndex) => (
                       <TableCell key={colIndex}>
                         <Input
@@ -206,6 +286,7 @@ export function CashBookPage() {
                           onBlur={(e) => handleCellBlur(e, rowIndex, colIndex)}
                           onChange={(e) => handleCellChange(e, rowIndex, colIndex)}
                           placeholder={`${getColumnName(colIndex)}${rowIndex + 1}`}
+                          className={selectedRows.has(rowIndex) || selectedCols.has(colIndex) ? 'bg-accent/20' : ''}
                         />
                       </TableCell>
                     ))}
@@ -216,6 +297,36 @@ export function CashBookPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {chartData.length > 0 && (
+        <Card className="mt-8">
+            <CardHeader>
+                <CardTitle>Chart Analysis</CardTitle>
+                <CardDescription>
+                    Bar chart of your selected data. The first selected column is used for labels, and subsequent selected columns are used for values.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip 
+                            contentStyle={{ 
+                                background: "hsl(var(--background))",
+                                border: "1px solid hsl(var(--border))"
+                            }}
+                        />
+                        <Legend />
+                        {selectedDataHeaders.map((header, index) => (
+                          <Bar key={header} dataKey={header} fill={chartColors[index % chartColors.length]} />
+                        ))}
+                    </RechartsBarChart>
+                </ResponsiveContainer>
+            </CardContent>
+        </Card>
+      )}
     </>
   );
 }
