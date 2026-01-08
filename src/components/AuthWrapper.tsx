@@ -3,10 +3,11 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useFirebase, useUser } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { Skeleton } from './ui/skeleton';
 
 const AUTH_ROUTES = ['/login', '/signup'];
 const PUBLIC_ROUTES: string[] = []; 
@@ -20,19 +21,11 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return; // Wait for user status to be determined
 
     const isAuthRoute = AUTH_ROUTES.includes(pathname);
-    const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
     if (!user) {
-      // If there's no user and not already on an auth route,
-      // try to sign in anonymously. If that fails or is not desired,
-      // redirect to login.
-      if (auth && !isAuthRoute) {
-        initiateAnonymousSignIn(auth);
-        // We don't redirect here immediately; we let the auth state update
-        // and re-trigger the effect. If anon sign-in is disabled or fails,
-        // the next run will see `user` as null and redirect.
-      } else if (!isAuthRoute) {
-          router.push('/login');
+      // If there's no user and not already on an auth route, redirect to login.
+      if (!isAuthRoute) {
+        router.push('/login');
       }
     } else {
       // User is logged in
@@ -43,20 +36,26 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, pathname, router, auth]);
 
-  if (isUserLoading) {
+  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+
+  if (isUserLoading || (!user && !isAuthRoute) || (user && isAuthRoute)) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
+        <div className="flex flex-col items-center gap-4">
+            <p className='text-lg font-semibold'>Loading...</p>
+            <Skeleton className="h-24 w-screen max-w-md" />
+            <Skeleton className="h-48 w-screen max-w-md" />
+        </div>
       </div>
     );
   }
   
-  // If we are on an auth route, we don't want to show the main layout
-  if (AUTH_ROUTES.includes(pathname)) {
+  // If we are on an auth route, we don't want to show the main layout, just the children (the login/signup page)
+  if (isAuthRoute) {
     return <>{children}</>;
   }
 
-
+  // If we have a user and are not on an auth route, show the main app layout
   return (
     <SidebarProvider>
       <AppSidebar />
