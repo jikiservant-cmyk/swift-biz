@@ -21,6 +21,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -46,6 +47,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
+      <SidebarRail />
       <SidebarHeader>
         <div className="flex items-center gap-2.5">
           <Button variant="ghost" size="icon" className="shrink-0 bg-primary/20 text-primary hover:bg-primary/30 hover:text-primary">
