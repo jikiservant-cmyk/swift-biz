@@ -42,16 +42,15 @@ export function CashBookPage() {
   );
   const { data: cashbookData, isLoading: isCashbookLoading } = useDoc<CashBook>(cashbookDocRef);
 
+  // Load data from Firestore
   useEffect(() => {
     if (cashbookData) {
       const loadedHeaders = cashbookData.headers || ["Header 1", "Header 2", "Header 3"];
       setHeaders(loadedHeaders);
       
       if(cashbookData.gridData) {
-        // Convert from array of objects back to 2D array for the UI
         const loadedGridData = cashbookData.gridData.map(rowObj => {
           const rowArray: string[] = [];
-          // Ensure we iterate in the same order as headers to maintain column integrity
           for(let i=0; i<loadedHeaders.length; i++) {
               rowArray[i] = rowObj[`col_${i}`] || "";
           }
@@ -63,7 +62,6 @@ export function CashBookPage() {
       }
 
     } else if (!isCashbookLoading) {
-      // Set initial data if no data exists
       const initialHeaders = ["Header 1", "Header 2", "Header 3"];
       setHeaders(initialHeaders);
       setGridData([
@@ -107,7 +105,6 @@ export function CashBookPage() {
     });
 
     try {
-      // Using a safer evaluation method than direct eval
       const result = new Function(`return ${expression}`)();
       return String(result);
     } catch (e) {
@@ -159,13 +156,11 @@ export function CashBookPage() {
     setGridData(gridData.map(row => [...row, ""]));
   };
 
-  const saveData = () => {
-    if (!cashbookDocRef) {
-      toast({ title: "Error", description: "You must be logged in to save.", variant: "destructive" });
+  const saveData = useCallback(() => {
+    if (!cashbookDocRef || isCashbookLoading) {
       return;
     }
     
-    // Convert 2D array to an array of objects for Firestore
     const gridDataForFirestore = gridData.map(row => {
       const rowObj: {[key: string]: string} = {};
       row.forEach((cell, index) => {
@@ -174,15 +169,28 @@ export function CashBookPage() {
       return rowObj;
     });
 
-    const dataToSave = { id: 'main', headers, gridData: gridDataForFirestore };
+    const dataToSave: CashBook = { id: 'main', headers, gridData: gridDataForFirestore };
     
     setDocumentNonBlocking(cashbookDocRef, dataToSave, { merge: true });
 
     toast({
-      title: "Data Saved!",
-      description: "Your cash book has been saved to the cloud.",
+      title: "Data Synced!",
+      description: "Your cash book is saved in real-time.",
     });
-  };
+  }, [cashbookDocRef, gridData, headers, isCashbookLoading, toast]);
+  
+  // Real-time save effect
+  useEffect(() => {
+    if (isCashbookLoading) return; // Don't save while initial data is loading
+    const handler = setTimeout(() => {
+      saveData();
+    }, 1000); // Debounce saves to every 1 second
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [gridData, headers, saveData, isCashbookLoading]);
+
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -204,7 +212,7 @@ export function CashBookPage() {
           setGridData(newGridData);
           toast({
             title: "File Uploaded",
-            description: "Data from the Excel file has been loaded. Click 'Save Data' to persist changes.",
+            description: "Data from the Excel file has been loaded. It will be saved automatically.",
           });
         }
       } catch (error) {
@@ -475,9 +483,6 @@ export function CashBookPage() {
             <Button onClick={() => fileInputRef.current?.click()} variant="outline">
               <Upload className="mr-2 h-4 w-4" /> Upload Excel
             </Button>
-            <Button onClick={saveData} variant="secondary">
-              <Save className="mr-2 h-4 w-4" /> Save Data
-            </Button>
             <Button onClick={handleInitialChartGeneration} variant="default">
               <BarChart className="mr-2 h-4 w-4" /> Generate Chart
             </Button>
@@ -614,4 +619,3 @@ export function CashBookPage() {
   );
 }
 
-    
