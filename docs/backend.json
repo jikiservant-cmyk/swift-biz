@@ -291,13 +291,13 @@
         },
         "gridData": {
           "type": "array",
+          "description": "An array of objects representing rows. Each object is a map of column IDs to cell values.",
           "items": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
-          },
-          "description": "A 2D array of strings representing the grid cell data."
+          }
         }
       },
       "required": [
@@ -523,4 +523,3 @@
     "reasoning": "The Firestore structure is designed to support the SwiftBiz application, focusing on task management, financial tracking, and client management. It prioritizes authorization independence and simple, robust security rules.  \n\nUser-owned data (Tasks, Incomes, Expenses, Payments) are stored under the `/users/{userId}` path to ensure clear ownership and simplified security rules.\n\nClients are stored in a top-level collection `/clients/{clientId}`. Authorization is handled via a `members` map within each client document. This `members` map is denormalized into related subcollections (tasks, payments, incomes) to ensure authorization independence.\n\nCategories are stored in a top-level collection `/categories/{categoryId}` as they are global and not user-specific.  \n\nAlerts are stored in a top-level collection `/alerts/{alertId}`. Security will rely on a separate process (e.g., Cloud Function) to manage alert creation and potentially restrict read access.\n\n**Authorization Independence:** The `members` map in the `/clients/{clientId}` document is copied into each document within the `/clients/{clientId}/tasks`, `/clients/{clientId}/incomes`, and `/clients/{clientId}/payments` subcollections. This denormalization ensures that security rules for these subcollections do not need to perform `get()` operations on the parent `client` document, maintaining atomic operations and simplifying security rule logic.\n\n**QAPs (Rules are not Filters):** The structure supports secure `list` operations by segregating data based on ownership and access control. User-specific data is stored under `/users/{userId}`, allowing easy filtering based on the authenticated user ID. The `members` map facilitates collaborative access control for client-related data, ensuring only authorized users can list and access data within the corresponding subcollections. The global `categories` collection and `alerts` collections may require additional constraints in security rules to prevent unauthorized access depending on the application's specific requirements."
   }
 }
-    

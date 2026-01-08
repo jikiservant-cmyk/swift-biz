@@ -31,7 +31,7 @@ export type Client = {
   email: string;
   phone: string;
   notes: string;
-  userId: string;
+  members: { [key: string]: 'owner' | 'viewer' };
 };
 
 export type UnpaidInvoice = {
@@ -44,7 +44,5 @@ export type UnpaidInvoice = {
 export type CashBook = {
   id: string;
   headers: string[];
-  gridData: string[][];
+  gridData: { [key: string]: string }[];
 };
-
-    

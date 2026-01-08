@@ -44,15 +44,32 @@ export function CashBookPage() {
 
   useEffect(() => {
     if (cashbookData) {
-      setHeaders(cashbookData.headers || ["Header 1", "Header 2", "Header 3"]);
-      setGridData(cashbookData.gridData || [["", "", ""], ["", "", ""], ["", "", ""]]);
+      const loadedHeaders = cashbookData.headers || ["Header 1", "Header 2", "Header 3"];
+      setHeaders(loadedHeaders);
+      
+      if(cashbookData.gridData) {
+        // Convert from array of objects back to 2D array for the UI
+        const loadedGridData = cashbookData.gridData.map(rowObj => {
+          const rowArray: string[] = [];
+          // Ensure we iterate in the same order as headers to maintain column integrity
+          for(let i=0; i<loadedHeaders.length; i++) {
+              rowArray[i] = rowObj[`col_${i}`] || "";
+          }
+          return rowArray;
+        });
+        setGridData(loadedGridData);
+      } else {
+        setGridData([["", "", ""], ["", "", ""], ["", "", ""]]);
+      }
+
     } else if (!isCashbookLoading) {
       // Set initial data if no data exists
-      setHeaders(["Header 1", "Header 2", "Header 3"]);
+      const initialHeaders = ["Header 1", "Header 2", "Header 3"];
+      setHeaders(initialHeaders);
       setGridData([
-        ["", "", ""],
-        ["", "", ""],
-        ["", "", ""],
+        Array(initialHeaders.length).fill(''),
+        Array(initialHeaders.length).fill(''),
+        Array(initialHeaders.length).fill(''),
       ]);
     }
   }, [cashbookData, isCashbookLoading]);
@@ -147,8 +164,20 @@ export function CashBookPage() {
       toast({ title: "Error", description: "You must be logged in to save.", variant: "destructive" });
       return;
     }
-    const dataToSave: Omit<CashBook, 'id'> = { headers, gridData };
+    
+    // Convert 2D array to an array of objects for Firestore
+    const gridDataForFirestore = gridData.map(row => {
+      const rowObj: {[key: string]: string} = {};
+      row.forEach((cell, index) => {
+        rowObj[`col_${index}`] = cell;
+      });
+      return rowObj;
+    });
+
+    const dataToSave = { headers, gridData: gridDataForFirestore };
+    
     setDocumentNonBlocking(cashbookDocRef, dataToSave, { merge: true });
+
     toast({
       title: "Data Saved!",
       description: "Your cash book has been saved to the cloud.",
@@ -490,7 +519,7 @@ export function CashBookPage() {
                         {rowIndex + 1}
                       </div>
                     </TableCell>
-                    {row.map((cell, colIndex) => (
+                    {headers.map((_, colIndex) => (
                       <TableCell key={colIndex}>
                         <Input
                           type="text"
@@ -556,5 +585,3 @@ export function CashBookPage() {
     </>
   );
 }
-
-    
