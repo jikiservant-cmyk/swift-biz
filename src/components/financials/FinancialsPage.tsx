@@ -30,12 +30,28 @@ export function FinancialsPage() {
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
 
-  const transactionsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null), // Simplified to one collection for this example
+  // Unified query for all transactions
+  const incomeQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
     [firestore, user]
   );
-  const { data: transactions, isLoading } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(transactionsQuery);
-  const transactionsWithDates = useMemo(() => transactions?.map(t => ({...t, date: t.date.toDate()})).sort((a,b) => b.date.getTime() - a.date.getTime()) || [], [transactions]);
+  const { data: incomeTxs, isLoading: isLoadingIncome } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(incomeQuery);
+
+  const expenseQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'expenses') : null),
+    [firestore, user]
+  );
+  const { data: expenseTxs, isLoading: isLoadingExpenses } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(expenseQuery);
+
+  const transactionsWithDates = useMemo(() => {
+    const allTxs = [
+      ...(incomeTxs || []).map(t => ({...t, type: 'income' as const})), 
+      ...(expenseTxs || []).map(t => ({...t, type: 'expense' as const}))
+    ];
+    return allTxs.map(t => ({...t, date: t.date.toDate()})).sort((a,b) => b.date.getTime() - a.date.getTime());
+  }, [incomeTxs, expenseTxs]);
+  
+  const isLoading = isLoadingIncome || isLoadingExpenses;
 
   const [dialogState, setDialogState] = useState<TransactionDialogState>({ isOpen: false, type: 'income', editingTransaction: null });
   const [activeTab, setActiveTab] = useState("income");
@@ -53,21 +69,26 @@ export function FinancialsPage() {
     setDialogState({ isOpen: true, type, editingTransaction: transaction });
   };
   
-  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date'> & { id?: string, date?: Date }) => {
+  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date' | 'userId'> & { id?: string, date?: Date }) => {
     if (!firestore || !user) return;
     
     const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
-    const txPayload = {
-      ...txData,
-      date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
-      userId: user.uid,
-    };
     
     if (txData.id) { // Editing
+      const txPayload = {
+        ...txData,
+        date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
+        userId: user.uid,
+      };
       const txRef = doc(firestore, 'users', user.uid, collectionName, txData.id);
       updateDocumentNonBlocking(txRef, txPayload);
       toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
     } else { // Creating
+      const txPayload = {
+        ...txData,
+        date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
+        userId: user.uid,
+      };
       const txCol = collection(firestore, 'users', user.uid, collectionName);
       addDocumentNonBlocking(txCol, txPayload);
       toast({ title: "Transaction added", description: "A new transaction has been recorded." });

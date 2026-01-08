@@ -12,6 +12,7 @@ export type Task = {
   dueDate: Date;
   status: 'todo' | 'in-progress' | 'completed';
   clientId?: string;
+  userId: string;
 };
 
 export type Transaction = {

@@ -70,22 +70,26 @@ export function TaskPage() {
     setIsDialogOpen(true);
   };
 
-  const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate'> & { id?: string; dueDate?: Date }) => {
+  const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
     if (!firestore || !user) return;
-
-    const taskPayload = {
-      ...taskData,
-      dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
-      userId: user.uid,
-    };
 
     if (taskData.id) {
       // Editing
+      const taskPayload = {
+        ...taskData,
+        dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
+        userId: user.uid,
+      };
       const taskRef = doc(firestore, 'users', user.uid, 'tasks', taskData.id);
       updateDocumentNonBlocking(taskRef, taskPayload);
       toast({ title: 'Task updated', description: 'The task has been successfully updated.' });
     } else {
       // Creating
+      const taskPayload = {
+        ...taskData,
+        dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
+        userId: user.uid,
+      };
       const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
       addDocumentNonBlocking(tasksCol, taskPayload);
       toast({ title: 'Task created', description: 'A new task has been added to your list.' });
@@ -247,8 +251,8 @@ function TaskFormDialog({ isOpen, setIsOpen, onSave, task, users, clients }: { i
   }, [task, isOpen]);
 
   const handleSubmit = () => {
-    // Only include assigneeId if it has a value
     const taskData: any = { id: task?.id, title, clientId, status, dueDate };
+    // Only include assigneeId if it's selected
     if (assigneeId) {
       taskData.assigneeId = assigneeId;
     }

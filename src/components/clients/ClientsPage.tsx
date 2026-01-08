@@ -12,7 +12,7 @@ import { Client, Task } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, doc, Timestamp } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -47,17 +47,18 @@ export function ClientsPage() {
     setIsClientDialogOpen(true);
   };
 
-  const handleSaveClient = (clientData: Omit<Client, 'id'> & { id?: string }) => {
+  const handleSaveClient = (clientData: Omit<Client, 'id' | 'userId'> & { id?: string }) => {
     if (!user || !firestore) return;
-    const clientPayload = { ...clientData, userId: user.uid };
-
+    
     if (clientData.id) {
       // Editing
+      const clientPayload = { ...clientData, userId: user.uid };
       const clientRef = doc(firestore, 'users', user.uid, 'clients', clientData.id);
       updateDocumentNonBlocking(clientRef, clientPayload);
       toast({ title: 'Client updated' });
     } else {
       // Creating
+      const clientPayload = { ...clientData, userId: user.uid };
       const clientsCol = collection(firestore, 'users', user.uid, 'clients');
       addDocumentNonBlocking(clientsCol, clientPayload);
       toast({ title: 'Client added' });
