@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
 export const metadata: Metadata = {
-  title: 'SwiftBiz',
+  title: 'Mubiru Farm',
   description: 'Your business, simplified.',
 };
 

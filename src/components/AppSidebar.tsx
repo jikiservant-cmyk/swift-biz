@@ -52,7 +52,7 @@ export function AppSidebar() {
             <Briefcase className="w-5 h-5" />
           </Button>
           <span className="font-headline text-lg text-sidebar-foreground">
-            SwiftBiz
+            Mubiru Farm
           </span>
         </div>
       </SidebarHeader>
