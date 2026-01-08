@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -34,7 +35,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useFirebase } from "@/firebase";
-import { getAuth } from "firebase/auth";
 
 const menuItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -46,10 +46,12 @@ const menuItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user } = useFirebase();
+  const { user, auth } = useFirebase();
 
   const handleLogout = () => {
-    getAuth().signOut();
+    if (auth) {
+      auth.signOut();
+    }
   };
 
   const userDisplayName = user?.isAnonymous ? 'Anonymous' : user?.email || 'Admin User';
