@@ -174,7 +174,7 @@ export function CashBookPage() {
       return rowObj;
     });
 
-    const dataToSave = { headers, gridData: gridDataForFirestore };
+    const dataToSave = { id: 'main', headers, gridData: gridDataForFirestore };
     
     setDocumentNonBlocking(cashbookDocRef, dataToSave, { merge: true });
 
@@ -267,17 +267,14 @@ export function CashBookPage() {
 
   }, [selectedRows, selectedCols, headers, viewData]);
 
-  const handleGenerateChart = () => {
+  const handleGenerateChart = useCallback(() => {
     if (selectedRows.size === 0 || selectedCols.size < 2) {
-      toast({
-        title: "Not enough data selected",
-        description: "Please select at least one row and two columns (one for labels, one for values).",
-        variant: "destructive",
-      });
+      setChartData([]); // Clear chart data if selection is invalid
       return;
     }
 
     if (chartType === 'pie' && selectedCols.size > 2) {
+      setChartData([]);
       toast({
         title: "Invalid selection for Pie Chart",
         description: "Please select one column for labels and one column for values for a pie chart.",
@@ -300,45 +297,52 @@ export function CashBookPage() {
             const header = headers[colIndex] || `Column ${colIndex + 1}`;
             const value = parseFloat(row[colIndex]);
             chartEntry[header] = isNaN(value) ? 0 : value;
-            // For pie chart, we'll just use a generic 'value' key
             if (chartType === 'pie') {
                 chartEntry['value'] = isNaN(value) ? 0 : value;
             }
         });
-
         return chartEntry;
     });
 
     setChartData(data);
-  };
+  }, [selectedRows, selectedCols, viewData, headers, chartType, toast]);
 
-  const handleAiAnalysis = async () => {
+  const handleAiAnalysis = useCallback(async () => {
     const selectedData = getSelectedData();
     if (selectedData.length === 0) {
-      toast({
-        title: "No data selected",
-        description: "Please select some rows and columns to analyze.",
-        variant: "destructive"
-      });
+      setAiAnalysis(null);
       return;
     }
 
     setIsAnalyzing(true);
-    setAiAnalysis(null);
     try {
       const result = await analyzeCashBookData({ jsonData: JSON.stringify(selectedData, null, 2) });
       setAiAnalysis(result.analysis);
     } catch (e) {
       console.error(e);
-      toast({
-        title: "AI Analysis Failed",
-        description: "There was an error while analyzing the data.",
-        variant: "destructive"
-      });
+      setAiAnalysis("There was an error while analyzing the data.");
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, [getSelectedData]);
+  
+  // Effect for real-time chart updates
+  useEffect(() => {
+    if (chartData.length > 0) {
+      handleGenerateChart();
+    }
+  }, [viewData, selectedRows, selectedCols, chartType, handleGenerateChart, chartData.length]);
+
+  // Effect for real-time AI analysis
+  useEffect(() => {
+    const debounceTimeout = setTimeout(() => {
+      if (aiAnalysis !== null) {
+        handleAiAnalysis();
+      }
+    }, 500); // Debounce to avoid excessive API calls while typing
+
+    return () => clearTimeout(debounceTimeout);
+  }, [viewData, selectedRows, selectedCols, handleAiAnalysis, aiAnalysis]);
 
 
   const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", "#FFBB28", "#FF8042"], []);
@@ -417,6 +421,30 @@ export function CashBookPage() {
             return null;
     }
   };
+  
+  const handleInitialChartGeneration = () => {
+    if (selectedRows.size === 0 || selectedCols.size < 2) {
+      toast({
+        title: "Not enough data selected",
+        description: "Please select at least one row and two columns (one for labels, one for values).",
+        variant: "destructive",
+      });
+      return;
+    }
+    handleGenerateChart();
+  };
+
+  const handleInitialAiAnalysis = () => {
+     if (selectedRows.size === 0 || selectedCols.size === 0) {
+      toast({
+        title: "No data selected",
+        description: "Please select some rows and columns to analyze.",
+        variant: "destructive"
+      });
+      return;
+    }
+    handleAiAnalysis();
+  };
 
 
   return (
@@ -450,7 +478,7 @@ export function CashBookPage() {
             <Button onClick={saveData} variant="secondary">
               <Save className="mr-2 h-4 w-4" /> Save Data
             </Button>
-            <Button onClick={handleGenerateChart} variant="default">
+            <Button onClick={handleInitialChartGeneration} variant="default">
               <BarChart className="mr-2 h-4 w-4" /> Generate Chart
             </Button>
             <Select value={chartType} onValueChange={(value) => setChartType(value as any)}>
@@ -472,7 +500,7 @@ export function CashBookPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
-             <Button onClick={handleAiAnalysis} disabled={isAnalyzing}>
+             <Button onClick={handleInitialAiAnalysis} disabled={isAnalyzing}>
               <Wand2 className="mr-2 h-4 w-4" /> {isAnalyzing ? 'Analyzing...' : 'Analyze with AI'}
             </Button>
           </div>
@@ -546,7 +574,7 @@ export function CashBookPage() {
             <CardHeader>
                 <CardTitle>Chart Analysis</CardTitle>
                 <CardDescription>
-                    {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart of your selected data. The first selected column is used for labels, and subsequent selected columns are used for values.
+                    {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart of your selected data. The chart will update in real-time as you edit the grid or change your selection.
                 </CardDescription>
             </CardHeader>
             <CardContent className="h-[400px]">
@@ -564,7 +592,7 @@ export function CashBookPage() {
                   <Wand2 className="h-5 w-5 text-primary" /> AI Analysis
                 </CardTitle>
                 <CardDescription>
-                    AI-powered insights based on your selected data.
+                    AI-powered insights based on your selected data. This analysis will update in real-time as you edit the grid.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -585,3 +613,5 @@ export function CashBookPage() {
     </>
   );
 }
+
+    
