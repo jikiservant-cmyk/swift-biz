@@ -75,7 +75,7 @@ export function FinancialsPage() {
     
     const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
     
-    const txPayload = {
+    const txPayload: any = {
       ...txData,
       date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
       userId: user.uid,
@@ -86,6 +86,7 @@ export function FinancialsPage() {
       updateDocumentNonBlocking(txRef, txPayload);
       toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
     } else { // Creating
+      delete txPayload.id; // Ensure no 'id' field is present when creating a new doc
       const txCol = collection(firestore, 'users', user.uid, collectionName);
       addDocumentNonBlocking(txCol, txPayload);
       toast({ title: "Transaction added", description: "A new transaction has been recorded." });
