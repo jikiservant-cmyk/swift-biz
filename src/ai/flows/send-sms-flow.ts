@@ -32,8 +32,8 @@ const sendSmsFlow = ai.defineFlow(
     const from = process.env.TWILIO_PHONE_NUMBER;
 
     if (!accountSid || !authToken || !from) {
-      console.error('Twilio credentials are not configured in .env file.');
-      throw new Error('Twilio service is not configured.');
+      // Throw an error that the client can handle, instead of just logging.
+      throw new Error('Twilio service is not configured. Please set credentials in your .env file.');
     }
 
     const client = twilio(accountSid, authToken);
@@ -45,10 +45,10 @@ const sendSmsFlow = ai.defineFlow(
         to,
       });
       console.log(`Message sent with SID: ${message.sid}`);
-    } catch (error) {
-      console.error('Failed to send SMS:', error);
-      // We don't re-throw the error to the client to avoid exposing service details,
-      // but we could implement more robust error handling here (e.g., a retry queue).
+    } catch (error: any) {
+      console.error('Failed to send SMS via Twilio:', error);
+      // Re-throw the error with a more client-friendly message.
+      throw new Error(`Failed to send SMS to ${to}: ${error.message}`);
     }
   }
 );
