@@ -146,7 +146,13 @@ export function FinancialsPage() {
         </Card>
       </div>
       
-      <Card className="mb-8">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList><TabsTrigger value="income">Income</TabsTrigger><TabsTrigger value="expense">Expenses</TabsTrigger></TabsList>
+        <TabsContent value="income"><TransactionsTable type="income" transactions={transactionsWithDates.filter(t => t.type === 'income')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} isLoading={isLoading} /></TabsContent>
+        <TabsContent value="expense"><TransactionsTable type="expense" transactions={transactionsWithDates.filter(t => t.type === 'expense')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} isLoading={isLoading}/></TabsContent>
+      </Tabs>
+      
+      <Card className="mt-8">
         <CardHeader>
           <CardTitle>Monthly Summary</CardTitle>
           <CardDescription>A visual comparison of your income and expenses for the current month.</CardDescription>
@@ -171,13 +177,6 @@ export function FinancialsPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList><TabsTrigger value="income">Income</TabsTrigger><TabsTrigger value="expense">Expenses</TabsTrigger></TabsList>
-        <TabsContent value="income"><TransactionsTable type="income" transactions={transactionsWithDates.filter(t => t.type === 'income')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} isLoading={isLoading} /></TabsContent>
-        <TabsContent value="expense"><TransactionsTable type="expense" transactions={transactionsWithDates.filter(t => t.type === 'expense')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} isLoading={isLoading}/></TabsContent>
-      </Tabs>
 
       <TransactionFormDialog 
         state={dialogState} 
