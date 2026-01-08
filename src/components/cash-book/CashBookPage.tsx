@@ -1,19 +1,20 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Wand2 } from "lucide-react";
+import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Wand2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { analyzeCashBookData } from "@/ai/flows/cash-book-analysis";
 import { Skeleton } from "@/components/ui/skeleton";
+import * as XLSX from 'xlsx';
 
 
 export function CashBookPage() {
@@ -27,6 +28,7 @@ export function CashBookPage() {
   const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -157,6 +159,42 @@ export function CashBookPage() {
       });
     }
   };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+
+        if (jsonData.length > 0) {
+          const newHeaders = jsonData[0];
+          const newGridData = jsonData.slice(1);
+          setHeaders(newHeaders);
+          setGridData(newGridData);
+          toast({
+            title: "File Uploaded",
+            description: "Data from the Excel file has been loaded.",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to parse Excel file", error);
+        toast({
+          title: "Upload Error",
+          description: "Could not parse the uploaded file.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
 
   const getColumnName = (index: number) => {
       return String.fromCharCode('A'.charCodeAt(0) + index);
@@ -339,11 +377,21 @@ export function CashBookPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2 mb-4">
-            <Button onClick={addRow}>
+             <Button onClick={addRow}>
               <Plus className="mr-2 h-4 w-4" /> Add Row
             </Button>
             <Button onClick={addColumn} variant="outline">
               <Plus className="mr-2 h-4 w-4" /> Add Column
+            </Button>
+             <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".xlsx, .xls"
+            />
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+              <Upload className="mr-2 h-4 w-4" /> Upload Excel
             </Button>
             <Button onClick={saveData} variant="secondary">
               <Save className="mr-2 h-4 w-4" /> Save Data
