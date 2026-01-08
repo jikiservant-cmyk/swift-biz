@@ -1,50 +1,103 @@
-import { generateAlerts } from "@/ai/flows/ai-powered-alerts";
-import { transactions, tasks, unpaidInvoices } from "@/lib/data";
-import { getThisMonthTransactions, getOverdueTasks } from "@/lib/helpers";
-import { AlertCircle, Zap } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+'use client';
 
-export async function AIAlerts() {
-  // Note: This component is still using static data.
-  // For a fully realtime experience, this should also be updated
-  // to use hooks and fetch data from firebase.
-  const monthlyTransactions = getThisMonthTransactions([]);
-  const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const monthlyExpenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-  const totalBalance = transactions.reduce((balance, t) => balance + (t.type === 'income' ? t.amount : -t.amount), 0);
-  const overdueTasks = getOverdueTasks([]);
+import { useEffect, useState } from 'react';
+import { generateAlerts } from '@/ai/flows/ai-powered-alerts';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { collection, Timestamp } from 'firebase/firestore';
+import { useMemo } from 'react';
+import { Task, Transaction } from '@/lib/types';
+import { getThisMonthTransactions, getOverdueTasks } from '@/lib/helpers';
+import { AlertCircle, Zap } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
-  try {
-    const alertsData = await generateAlerts({
-      cashBalance: totalBalance,
-      overdueTasksCount: overdueTasks.length,
-      totalTasksCount: tasks.length,
-      unpaidInvoices: unpaidInvoices.length,
-      monthlyIncome: monthlyIncome,
-      monthlyExpenses: monthlyExpenses,
-    });
+export function AIAlerts() {
+  const { firestore, user } = useFirebase();
+  const [alerts, setAlerts] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-    if (!alertsData.alerts || alertsData.alerts.length === 0) {
-      return null;
+  const incomeQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
+    [firestore, user]
+  );
+  const { data: incomeTxs, isLoading: isLoadingIncome } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(incomeQuery);
+
+  const expenseQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'expenses') : null),
+    [firestore, user]
+  );
+  const { data: expenseTxs, isLoading: isLoadingExpenses } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(expenseQuery);
+
+  const transactionsWithDates = useMemo(() => {
+    const allTxs = [
+      ...(incomeTxs || []).map(t => ({...t, type: 'income' as const})),
+      ...(expenseTxs || []).map(t => ({...t, type: 'expense' as const}))
+    ];
+    return allTxs.map(t => ({...t, date: t.date.toDate()})).sort((a,b) => b.date.getTime() - a.date.getTime());
+  }, [incomeTxs, expenseTxs]);
+
+  const tasksQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'tasks') : null),
+    [firestore, user]
+  );
+  const { data: tasks, isLoading: isLoadingTasks } = useCollection<Omit<Task, 'dueDate'> & { dueDate: Timestamp }>(tasksQuery);
+  const tasksWithDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
+
+  useEffect(() => {
+    async function fetchAlerts() {
+      if (isLoadingIncome || isLoadingExpenses || isLoadingTasks) return;
+
+      const monthlyTransactions = getThisMonthTransactions(transactionsWithDates);
+      const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const monthlyExpenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+      const totalBalance = transactionsWithDates.reduce((balance, t) => balance + (t.type === 'income' ? t.amount : -t.amount), 0);
+      const overdueTasks = getOverdueTasks(tasksWithDates);
+
+      try {
+        setIsLoading(true);
+        const alertsData = await generateAlerts({
+          cashBalance: totalBalance,
+          overdueTasksCount: overdueTasks.length,
+          totalTasksCount: tasksWithDates.length,
+          unpaidInvoices: 0, // Static data removed, can be replaced with firestore collection
+          monthlyIncome: monthlyIncome,
+          monthlyExpenses: monthlyExpenses,
+        });
+        if (alertsData.alerts) {
+          setAlerts(alertsData.alerts);
+        }
+      } catch (error) {
+        console.error('AIAlerts Error:', error);
+        setAlerts([]);
+      } finally {
+        setIsLoading(false);
+      }
     }
 
-    return (
-      <Alert className="bg-accent/10 border-accent/50 text-accent-foreground dark:bg-accent/20">
-        <AlertCircle className="h-4 w-4 !text-accent" />
-        <AlertTitle className="text-accent font-bold flex items-center gap-2">
-          <Zap className="h-4 w-4" /> AI Powered Alerts
-        </AlertTitle>
-        <AlertDescription className="text-foreground">
-          <ul className="list-disc pl-5 mt-2 space-y-1">
-            {alertsData.alerts.map((alert, index) => (
-              <li key={index}>{alert}</li>
-            ))}
-          </ul>
-        </AlertDescription>
-      </Alert>
-    );
-  } catch (error) {
-    console.error("AIAlerts Error:", error);
+    fetchAlerts();
+  }, [isLoadingIncome, isLoadingExpenses, isLoadingTasks, transactionsWithDates, tasksWithDates]);
+
+  if (isLoading) {
+    return <Skeleton className="h-24 w-full" />;
+  }
+
+  if (alerts.length === 0) {
     return null;
   }
+
+  return (
+    <Alert className="bg-accent/10 border-accent/50 text-accent-foreground dark:bg-accent/20">
+      <AlertCircle className="h-4 w-4 !text-accent" />
+      <AlertTitle className="text-accent font-bold flex items-center gap-2">
+        <Zap className="h-4 w-4" /> AI Powered Alerts
+      </AlertTitle>
+      <AlertDescription className="text-foreground">
+        <ul className="list-disc pl-5 mt-2 space-y-1">
+          {alerts.map((alert, index) => (
+            <li key={index}>{alert}</li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
+  );
 }
