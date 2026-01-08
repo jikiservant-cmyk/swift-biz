@@ -74,6 +74,37 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
+          <SidebarMenuItem>
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton tooltip="Account" className="w-full">
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/40/40`} alt={userDisplayName} />
+                    <AvatarFallback>{userAvatarFallback}</AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{userDisplayName}</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 mb-2" side="right" align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+          <SidebarSeparator />
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
@@ -91,34 +122,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton tooltip="Account" className="w-full">
-              <Avatar className="w-6 h-6">
-                <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/40/40`} alt={userDisplayName} />
-                <AvatarFallback>{userAvatarFallback}</AvatarFallback>
-              </Avatar>
-              <span className="truncate">{userDisplayName}</span>
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 mb-2" side="right" align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <UserIcon className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Footer is now empty */}
       </SidebarFooter>
     </Sidebar>
   );
