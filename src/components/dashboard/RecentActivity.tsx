@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { formatDate } from "@/lib/helpers";
 import { isPast, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, Timestamp } from "firebase/firestore";
+import { collection, Timestamp, query, where } from "firebase/firestore";
 import { useMemo } from "react";
 import { Task, Client, User } from "@/lib/types";
 import { users as staticUsers } from "@/lib/data";
@@ -25,7 +26,7 @@ export function RecentActivity() {
   const tasksWithDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
 
   const clientsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, 'users', user.uid, 'clients') : null),
+    () => (user ? query(collection(firestore, 'clients'), where(`members.${user.uid}`, 'in', ['owner', 'viewer'])) : null),
     [firestore, user]
   );
   const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
