@@ -1,4 +1,4 @@
-import { transactions, tasks } from "@/lib/data";
+import { type Task, type Transaction } from "@/lib/types";
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
  
@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function getThisMonthTransactions() {
+export function getThisMonthTransactions(transactions: Transaction[]) {
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
@@ -16,7 +16,7 @@ export function getThisMonthTransactions() {
   });
 }
 
-export function getOverdueTasks() {
+export function getOverdueTasks(tasks: Task[]) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return tasks.filter(t => t.status !== 'completed' && new Date(t.dueDate) < today);

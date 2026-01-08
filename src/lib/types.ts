@@ -8,10 +8,10 @@ export type User = {
 export type Task = {
   id: string;
   title: string;
-  assignee?: User;
+  assigneeId?: string;
   dueDate: Date;
   status: 'todo' | 'in-progress' | 'completed';
-  client?: Client;
+  clientId?: string;
 };
 
 export type Transaction = {
@@ -21,6 +21,7 @@ export type Transaction = {
   amount: number;
   category: string;
   date: Date;
+  userId: string;
 };
 
 export type Client = {
@@ -29,6 +30,7 @@ export type Client = {
   email: string;
   phone: string;
   notes: string;
+  userId: string;
 };
 
 export type UnpaidInvoice = {

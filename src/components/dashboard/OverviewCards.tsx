@@ -1,14 +1,36 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { unpaidInvoices } from "@/lib/data";
 import { getThisMonthTransactions, getOverdueTasks, formatCurrency } from "@/lib/helpers";
 import { ArrowUpRight, ArrowDownLeft, Clock, AlertTriangle } from "lucide-react";
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection, Timestamp } from "firebase/firestore";
+import { useMemo } from "react";
+import { Task, Transaction } from "@/lib/types";
+import { unpaidInvoices as staticUnpaidInvoices } from "@/lib/data";
 
 export function OverviewCards() {
-  const monthlyTransactions = getThisMonthTransactions();
+  const { firestore, user } = useFirebase();
+
+  const transactionsQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
+    [firestore, user]
+  );
+  const { data: transactions } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(transactionsQuery);
+  const transactionsWithDates = useMemo(() => transactions?.map(t => ({...t, date: t.date.toDate()})) || [], [transactions]);
+
+  const tasksQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'tasks') : null),
+    [firestore, user]
+  );
+  const { data: tasks } = useCollection<Omit<Task, 'dueDate'> & { dueDate: Timestamp }>(tasksQuery);
+  const tasksWithDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
+
+  const monthlyTransactions = getThisMonthTransactions(transactionsWithDates);
   const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const monthlyExpenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-  const overdueTasksCount = getOverdueTasks().length;
-  const unpaidInvoicesCount = unpaidInvoices.length;
+  const overdueTasksCount = getOverdueTasks(tasksWithDates).length;
+  const unpaidInvoicesCount = staticUnpaidInvoices.length;
 
   const cards = [
     {
@@ -36,7 +58,7 @@ export function OverviewCards() {
       title: "Unpaid Invoices",
       Icon: AlertTriangle,
       value: `+${unpaidInvoicesCount}`,
-      details: `Totaling ${formatCurrency(unpaidInvoices.reduce((sum, inv) => sum + inv.amount, 0))}`,
+      details: `Totaling ${formatCurrency(staticUnpaidInvoices.reduce((sum, inv) => sum + inv.amount, 0))}`,
       color: "text-orange-500",
     },
   ];

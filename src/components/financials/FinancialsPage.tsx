@@ -11,11 +11,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { Transaction } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/helpers";
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection, doc, Timestamp } from "firebase/firestore";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+
 
 type TransactionDialogState = {
   isOpen: boolean;
@@ -23,16 +26,24 @@ type TransactionDialogState = {
   editingTransaction: Transaction | null;
 }
 
-export function FinancialsPage({ initialTransactions }: { initialTransactions: Transaction[] }) {
+export function FinancialsPage() {
   const { toast } = useToast();
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const { firestore, user } = useFirebase();
+
+  const transactionsQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null), // Simplified to one collection for this example
+    [firestore, user]
+  );
+  const { data: transactions, isLoading } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(transactionsQuery);
+  const transactionsWithDates = useMemo(() => transactions?.map(t => ({...t, date: t.date.toDate()})).sort((a,b) => b.date.getTime() - a.date.getTime()) || [], [transactions]);
+
   const [dialogState, setDialogState] = useState<TransactionDialogState>({ isOpen: false, type: 'income', editingTransaction: null });
   const [activeTab, setActiveTab] = useState("income");
 
   const monthlyTxs = useMemo(() => {
     const now = new Date();
-    return transactions.filter(t => new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear());
-  }, [transactions]);
+    return transactionsWithDates.filter(t => new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear());
+  }, [transactionsWithDates]);
   
   const monthlyIncome = monthlyTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const monthlyExpenses = monthlyTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
@@ -42,20 +53,33 @@ export function FinancialsPage({ initialTransactions }: { initialTransactions: T
     setDialogState({ isOpen: true, type, editingTransaction: transaction });
   };
   
-  const handleSaveTransaction = (txData: Omit<Transaction, 'id'> & { id?: string }) => {
+  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date'> & { id?: string, date?: Date }) => {
+    if (!firestore || !user) return;
+    
+    const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
+    const txPayload = {
+      ...txData,
+      date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
+      userId: user.uid,
+    };
+    
     if (txData.id) { // Editing
-      setTransactions(transactions.map(t => t.id === txData.id ? { ...t, ...txData } as Transaction : t));
+      const txRef = doc(firestore, 'users', user.uid, collectionName, txData.id);
+      updateDocumentNonBlocking(txRef, txPayload);
       toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
     } else { // Creating
-      const newTx: Transaction = { ...txData, id: `trans-${Date.now()}` };
-      setTransactions([newTx, ...transactions].sort((a,b) => b.date.getTime() - a.date.getTime()));
+      const txCol = collection(firestore, 'users', user.uid, collectionName);
+      addDocumentNonBlocking(txCol, txPayload);
       toast({ title: "Transaction added", description: "A new transaction has been recorded." });
     }
     setDialogState({ isOpen: false, type: 'income', editingTransaction: null });
   };
   
-  const handleDeleteTransaction = (txId: string) => {
-    setTransactions(transactions.filter(t => t.id !== txId));
+  const handleDeleteTransaction = (tx: Transaction) => {
+    if(!firestore || !user) return;
+    const collectionName = tx.type === 'income' ? 'incomes' : 'expenses';
+    const txRef = doc(firestore, 'users', user.uid, collectionName, tx.id);
+    deleteDocumentNonBlocking(txRef);
     toast({ title: "Transaction deleted", variant: "destructive", description: "The transaction has been removed." });
   };
 
@@ -96,8 +120,8 @@ export function FinancialsPage({ initialTransactions }: { initialTransactions: T
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList><TabsTrigger value="income">Income</TabsTrigger><TabsTrigger value="expense">Expenses</TabsTrigger></TabsList>
-        <TabsContent value="income"><TransactionsTable type="income" transactions={transactions.filter(t => t.type === 'income')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} /></TabsContent>
-        <TabsContent value="expense"><TransactionsTable type="expense" transactions={transactions.filter(t => t.type === 'expense')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction}/></TabsContent>
+        <TabsContent value="income"><TransactionsTable type="income" transactions={transactionsWithDates.filter(t => t.type === 'income')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} isLoading={isLoading} /></TabsContent>
+        <TabsContent value="expense"><TransactionsTable type="expense" transactions={transactionsWithDates.filter(t => t.type === 'expense')} onEdit={handleOpenDialog} onDelete={handleDeleteTransaction} isLoading={isLoading}/></TabsContent>
       </Tabs>
 
       <TransactionFormDialog 
@@ -109,14 +133,15 @@ export function FinancialsPage({ initialTransactions }: { initialTransactions: T
   );
 }
 
-function TransactionsTable({ type, transactions, onEdit, onDelete }: { type: 'income' | 'expense', transactions: Transaction[], onEdit: (type: 'income' | 'expense', tx: Transaction) => void, onDelete: (id: string) => void }) {
+function TransactionsTable({ type, transactions, onEdit, onDelete, isLoading }: { type: 'income' | 'expense', transactions: Transaction[], onEdit: (type: 'income' | 'expense', tx: Transaction) => void, onDelete: (tx: Transaction) => void, isLoading: boolean }) {
   return (
     <Card>
       <CardContent className="p-0">
         <Table>
           <TableHeader><TableRow><TableHead>Description</TableHead><TableHead>Category</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[80px]"></TableHead></TableRow></TableHeader>
           <TableBody>
-            {transactions.map(tx => (
+            {isLoading && <TableRow><TableCell colSpan={5} className="text-center">Loading...</TableCell></TableRow>}
+            {!isLoading && transactions.map(tx => (
               <TableRow key={tx.id}>
                 <TableCell className="font-medium">{tx.description}</TableCell>
                 <TableCell className="text-muted-foreground">{tx.category}</TableCell>
@@ -127,7 +152,7 @@ function TransactionsTable({ type, transactions, onEdit, onDelete }: { type: 'in
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => onEdit(type, tx)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete(tx.id)}><Trash className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete(tx)}><Trash className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
