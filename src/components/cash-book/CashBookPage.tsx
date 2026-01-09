@@ -224,10 +224,6 @@ export function CashBookPage() {
           const newGridData = jsonData.slice(1);
           setHeaders(newHeaders);
           setGridData(newGridData);
-          toast({
-            title: "File Uploaded",
-            description: "Data from the Excel file has been loaded and will be synced.",
-          });
         }
       } catch (error) {
         console.error("Failed to parse Excel file", error);
@@ -288,6 +284,7 @@ export function CashBookPage() {
 
     const data = Array.from(selectedRows).map(rowIndex => {
         const row = viewData[rowIndex];
+        if (!row) return null; // FIX: Guard against undefined row
         const chartEntry: {[key: string]: string | number} = {
             name: row[labelColumnIndex] || `Row ${rowIndex + 1}`
         };
@@ -301,7 +298,7 @@ export function CashBookPage() {
             }
         });
         return chartEntry;
-    });
+    }).filter(Boolean) as any[]; // Filter out null entries
 
     setChartData(data);
   }, [isChartVisible, selectedRows, selectedCols, viewData, headers, chartType, toast]);
@@ -315,13 +312,14 @@ export function CashBookPage() {
     const selCols = Array.from(selectedCols).sort((a, b) => a - b);
     const selectedData = Array.from(selectedRows).map(rowIndex => {
         const row = viewData[rowIndex];
+        if (!row) return null;
         const entry: {[key: string]: string} = {};
         selCols.forEach(colIndex => {
             const header = headers[colIndex] || `Column ${colIndex + 1}`;
             entry[header] = row[colIndex];
         });
         return entry;
-    });
+    }).filter(Boolean);
 
     if (selectedData.length === 0) {
       setAiAnalysis(null);
@@ -599,7 +597,7 @@ export function CashBookPage() {
                 <CardDescription>
                     AI-powered insights based on your selected data. This analysis updates in real-time as you edit the grid.
                 </CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent>
                 {isAnalyzing ? (
                   <div className="space-y-2">
@@ -622,5 +620,3 @@ export function CashBookPage() {
     </>
   );
 }
-
-    
