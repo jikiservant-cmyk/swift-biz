@@ -597,7 +597,7 @@ export function CashBookPage() {
                 <CardDescription>
                     AI-powered insights based on your selected data. This analysis updates in real-time as you edit the grid.
                 </CardDescription>
-            </Header>
+            </CardHeader>
             <CardContent>
                 {isAnalyzing ? (
                   <div className="space-y-2">
