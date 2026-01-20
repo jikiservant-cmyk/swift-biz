@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -18,17 +17,24 @@ export default function SignupPage() {
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const auth = getAuth();
-      initiateEmailSignUp(auth, email, password);
-      // The onAuthStateChanged listener in AuthWrapper will handle the redirect
-    } catch (error: any) {
+
+    if (!email || !password) {
+      toast({
+        variant: 'destructive',
+        title: 'Signup Failed',
+        description: 'Please enter both email and password.',
+      });
+      return;
+    }
+
+    const auth = getAuth();
+    initiateEmailSignUp(auth, email, password, (error: any) => {
       toast({
         variant: 'destructive',
         title: 'Signup Failed',
         description: error.message || 'An unexpected error occurred.',
       });
-    }
+    });
   };
 
   return (
