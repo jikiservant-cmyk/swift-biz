@@ -7,19 +7,19 @@ export const users: User[] = [
 ];
 
 export const clients: Client[] = [
-  { id: 'client-1', name: 'Innovate Corp', email: 'contact@innovate.com', phone: '555-0101', notes: 'Long-term client, focus on Q3 goals. They prefer weekly updates via email and are very responsive.', userId: 'user-1' },
-  { id: 'client-2', name: 'Data Systems', email: 'hello@datasys.io', phone: '555-0102', notes: 'New client, onboarded last month. They are on a trial package and need extra attention to convert to a long-term contract.', userId: 'user-1' },
-  { id: 'client-3', name: 'Market Movers', email: 'support@marketmovers.co', phone: '555-0103', notes: 'Needs urgent attention on the branding project. The deadline is approaching fast.', userId: 'user-1' },
-  { id: 'client-4', name: 'QuantumLeap', email: 'inquiries@qleap.tech', phone: '555-0104', notes: 'High value client, monthly retainer. Always pay on time. Main contact is Sarah.', userId: 'user-1' },
+  { id: 'client-1', name: 'Innovate Corp', email: 'contact@innovate.com', phone: '555-0101', notes: 'Long-term client, focus on Q3 goals. They prefer weekly updates via email and are very responsive.', members: { 'user-1': 'owner' } },
+  { id: 'client-2', name: 'Data Systems', email: 'hello@datasys.io', phone: '555-0102', notes: 'New client, onboarded last month. They are on a trial package and need extra attention to convert to a long-term contract.', members: { 'user-1': 'owner' } },
+  { id: 'client-3', name: 'Market Movers', email: 'support@marketmovers.co', phone: '555-0103', notes: 'Needs urgent attention on the branding project. The deadline is approaching fast.', members: { 'user-1': 'owner' } },
+  { id: 'client-4', name: 'QuantumLeap', email: 'inquiries@qleap.tech', phone: '555-0104', notes: 'High value client, monthly retainer. Always pay on time. Main contact is Sarah.', members: { 'user-1': 'owner' } },
 ];
 
 export const tasks: Task[] = [
-  { id: 'task-1', title: 'Draft Q3 report for Innovate Corp', assigneeId: 'user-1', dueDate: new Date(new Date().setDate(new Date().getDate() + 2)), status: 'in-progress', clientId: 'client-1' },
-  { id: 'task-2', title: 'Finalize branding mockups for Market Movers', assigneeId: 'user-2', dueDate: new Date(new Date().setDate(new Date().getDate() - 1)), status: 'in-progress', clientId: 'client-3' },
-  { id: 'task-3', title: 'Onboarding call with Data Systems', assigneeId: 'user-1', dueDate: new Date(), status: 'todo' },
-  { id: 'task-4', title: 'Develop API integration for QuantumLeap', assigneeId: 'user-2', dueDate: new Date(new Date().setDate(new Date().getDate() + 10)), status: 'todo', clientId: 'client-4' },
-  { id: 'task-5', title: 'Review project proposal for Data Systems', assigneeId: 'user-1', dueDate: new Date(new Date().setDate(new Date().getDate() - 5)), status: 'completed', clientId: 'client-1' },
-  { id: 'task-6', title: 'Send invoice #1234 to Innovate Corp', assigneeId: 'user-1', dueDate: new Date(new Date().setDate(new Date().getDate() - 3)), status: 'todo', clientId: 'client-1' },
+  { id: 'task-1', title: 'Draft Q3 report for Innovate Corp', assigneeId: 'user-1', dueDate: new Date(new Date().setDate(new Date().getDate() + 2)), status: 'in-progress', clientId: 'client-1', userId: 'user-1' },
+  { id: 'task-2', title: 'Finalize branding mockups for Market Movers', assigneeId: 'user-2', dueDate: new Date(new Date().setDate(new Date().getDate() - 1)), status: 'in-progress', clientId: 'client-3', userId: 'user-1' },
+  { id: 'task-3', title: 'Onboarding call with Data Systems', assigneeId: 'user-1', dueDate: new Date(), status: 'todo', userId: 'user-1' },
+  { id: 'task-4', title: 'Develop API integration for QuantumLeap', assigneeId: 'user-2', dueDate: new Date(new Date().setDate(new Date().getDate() + 10)), status: 'todo', clientId: 'client-4', userId: 'user-1' },
+  { id: 'task-5', title: 'Review project proposal for Data Systems', assigneeId: 'user-1', dueDate: new Date(new Date().setDate(new Date().getDate() - 5)), status: 'completed', clientId: 'client-1', userId: 'user-1' },
+  { id: 'task-6', title: 'Send invoice #1234 to Innovate Corp', assigneeId: 'user-1', dueDate: new Date(new Date().setDate(new Date().getDate() - 3)), status: 'todo', clientId: 'client-1', userId: 'user-1' },
 ];
 
 const today = new Date();
@@ -46,3 +46,5 @@ export const unpaidInvoices: UnpaidInvoice[] = [
     // { id: 'inv-1', client: clients[2], amount: 1800, dueDate: new Date(new Date().setDate(new Date().getDate() - 7)) },
     // { id: 'inv-2', client: clients[0], amount: 2200, dueDate: new Date(new Date().setDate(new Date().getDate() - 2)) },
 ];
+
+    

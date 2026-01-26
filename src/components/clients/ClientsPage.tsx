@@ -50,7 +50,7 @@ export function ClientsPage() {
     setIsClientDialogOpen(true);
   };
 
-  const handleSaveClient = (clientData: Omit<Client, 'id' | 'userId'> & { id?: string }) => {
+  const handleSaveClient = (clientData: Omit<Client, 'id'> & { id?: string }) => {
     if (!user || !firestore) return;
     
     if (clientData.id) {
@@ -330,3 +330,5 @@ function BulkSmsDialog({ isOpen, setIsOpen, onSend, isSending }: { isOpen: boole
     </Dialog>
   );
 }
+
+    
