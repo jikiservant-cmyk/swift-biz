@@ -12,24 +12,40 @@ import { unpaidInvoices as staticUnpaidInvoices } from "@/lib/data";
 export function OverviewCards() {
   const { firestore, user } = useFirebase();
 
-  const transactionsQuery = useMemoFirebase(
+  // Fetch both income and expense transactions
+  const incomeQuery = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
     [firestore, user]
   );
-  const { data: transactions } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(transactionsQuery);
-  const transactionsWithDates = useMemo(() => transactions?.map(t => ({...t, date: t.date.toDate()})) || [], [transactions]);
+  const { data: incomeTxs } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(incomeQuery);
 
+  const expenseQuery = useMemoFirebase(
+    () => (user ? collection(firestore, 'users', user.uid, 'expenses') : null),
+    [firestore, user]
+  );
+  const { data: expenseTxs } = useCollection<Omit<Transaction, 'date'> & { date: Timestamp }>(expenseQuery);
+
+  // Combine transactions and convert Timestamps to Dates
+  const transactionsWithDates = useMemo(() => {
+    const allTxs = [
+      ...(incomeTxs || []).map(t => ({...t, type: 'income' as const})),
+      ...(expenseTxs || []).map(t => ({...t, type: 'expense' as const}))
+    ];
+    return allTxs.map(t => ({...t, date: t.date.toDate()}));
+  }, [incomeTxs, expenseTxs]);
+
+  // Fetch tasks
   const tasksQuery = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'tasks') : null),
     [firestore, user]
   );
   const { data: tasks } = useCollection<Omit<Task, 'dueDate'> & { dueDate: Timestamp }>(tasksQuery);
-  const tasksWithDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
+  const tasksWithDueDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
 
   const monthlyTransactions = getThisMonthTransactions(transactionsWithDates);
   const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const monthlyExpenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-  const overdueTasksCount = getOverdueTasks(tasksWithDates).length;
+  const overdueTasksCount = getOverdueTasks(tasksWithDueDates).length;
   const unpaidInvoicesCount = staticUnpaidInvoices.length;
 
   const cards = [
