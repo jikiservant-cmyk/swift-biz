@@ -51,7 +51,7 @@ const alertPrompt = ai.definePrompt({
   - High Unpaid Invoices: If there are a high number of unpaid invoices, generate an "High Unpaid Invoices" alert.
   - Income Less Than Expenses: If monthly income is less than monthly expenses, generate an "Income Less Than Expenses" alert.
 
-  Output only the alerts in a JSON array format.
+  Your response must be a JSON object with a single key "alerts" which contains an array of alert strings.
   `,
 });
 

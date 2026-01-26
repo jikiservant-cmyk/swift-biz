@@ -44,7 +44,7 @@ const analysisPrompt = ai.definePrompt({
   - Identification of any potential issues or anomalies.
   - Actionable insights or recommendations.
 
-  Keep the analysis concise and easy to understand. Present the output as a single string.
+  Keep the analysis concise and easy to understand. Your response must be a JSON object with a single key "analysis" containing your full analysis as a string.
   `,
 });
 
