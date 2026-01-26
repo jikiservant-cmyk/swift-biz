@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview An AI-powered alert system for Mubiru Farm.
+ * @fileOverview An AI-powered alert system for bis.
  *
  * - generateAlerts - A function that checks for critical issues and generates alerts.
  * - AIPoweredAlertsInput - The input type for the generateAlerts function.
@@ -34,7 +34,7 @@ const alertPrompt = ai.definePrompt({
   name: 'alertPrompt',
   input: {schema: AIPoweredAlertsInputSchema},
   output: {schema: AIPoweredAlertsOutputSchema},
-  prompt: `You are an AI assistant designed to identify critical issues for Mubiru Farm users and generate concise alerts.
+  prompt: `You are an AI assistant designed to identify critical issues for bis users and generate concise alerts.
 
   Based on the following information, determine if there are any urgent financial or operational problems that require the user's attention. If so, create a list of alerts that summarize the issues. Keep the alerts concise and scannable.
 

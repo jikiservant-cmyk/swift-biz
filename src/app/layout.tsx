@@ -5,7 +5,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthWrapper } from '@/components/AuthWrapper';
 
 export const metadata: Metadata = {
-  title: 'Mubiru Farm',
+  title: 'bis',
   description: 'Your business, simplified.',
 };
 
