@@ -92,73 +92,62 @@ export function CashBookPage() {
   };
 
   const evaluateFormula = useCallback((formula: string, visited = new Set<string>()): string => {
-    if (!formula || !formula.startsWith('=')) return formula;
+    if (!formula || !formula.startsWith('=')) {
+      return formula;
+    }
   
-    const expression = formula.substring(1);
+    const expression = formula.substring(1).toUpperCase();
   
-    // This regex splits the expression by operators but keeps the operators in the array.
-    const operators = /([+\-*/])/g;
-    const parts = expression.split(operators);
+    const cellRefRegex = /[A-Z]+\d+/g;
+    
+    try {
+      const evaluatedExpression = expression.replace(cellRefRegex, (match) => {
+        const cellId = match;
   
-    const evaluatedParts = parts.map(part => {
-      const trimmedPart = part.trim();
-      if (!trimmedPart) return ''; // Keep empty parts which can result from split
-      if (['+', '-', '*', '/'].includes(trimmedPart)) {
-        return trimmedPart;
-      }
-  
-      // It's not an operator, so it should be a number or a cell reference.
-      // If it's already a valid number, return it.
-      if (!isNaN(parseFloat(trimmedPart)) && isFinite(Number(trimmedPart))) {
-        return trimmedPart;
-      }
-  
-      // Check if it's a valid cell reference (e.g., A1, B12, AA7)
-      if (/^[A-Z]+\d+$/.test(trimmedPart)) {
-        const cellId = trimmedPart;
         if (visited.has(cellId)) {
-          // Circular dependency detected
-          return "0";
+          throw new Error("#REF!");
         }
         visited.add(cellId);
   
         const colLetters = cellId.match(/[A-Z]+/)?.[0];
         const rowNumStr = cellId.match(/\d+/)?.[0];
         
-        if (!colLetters || !rowNumStr) return '0';
+        if (!colLetters || !rowNumStr) {
+            throw new Error("#NAME?");
+        }
   
         const colIndex = colToIdx(colLetters);
         const rowIndex = parseInt(rowNumStr, 10) - 1;
   
-        if (rowIndex >= 0 && rowIndex < gridData.length && colIndex >= 0 && colIndex < headers.length) {
-          const cellValue = gridData[rowIndex]?.[colIndex] || '0';
-          
-          if (cellValue.startsWith('=')) {
-            // Recursively evaluate if the referenced cell also has a formula
-            const evaluatedValue = evaluateFormula(cellValue, new Set(visited));
-            const num = parseFloat(evaluatedValue);
-            return isNaN(num) ? '0' : evaluatedValue;
-          }
-          
-          // It's a plain value, parse it.
-          const num = parseFloat(cellValue);
-          return isNaN(num) ? '0' : cellValue;
+        if (rowIndex < 0 || rowIndex >= gridData.length || colIndex < 0 || colIndex >= headers.length) {
+          return '0'; // Out of bounds is 0
         }
-        // Cell is out of bounds
-        return '0';
+  
+        const cellValue = gridData[rowIndex]?.[colIndex] || '0';
+  
+        if (cellValue.startsWith('=')) {
+          const result = evaluateFormula(cellValue, new Set(visited));
+           visited.delete(cellId); // Allow re-evaluation of the same cell in different contexts
+           return result;
+        }
+        
+        const num = Number(cellValue.trim());
+        return isNaN(num) ? '0' : String(num);
+      });
+      
+      if (/[A-Z]/i.test(evaluatedExpression.replace(/"[^"]*"/g, ''))) {
+          throw new Error("#NAME?");
       }
-  
-      // If it's not an operator, a number, or a valid cell reference, treat it as 0 to avoid errors.
-      return '0';
-    });
-  
-    const safeExpression = evaluatedParts.join(' ');
-  
-    try {
-      // Evaluate the sanitized expression.
-      const result = new Function(`return ${safeExpression}`)();
-      return result != null ? String(result) : "0";
-    } catch (e) {
+
+      const result = new Function(`return ${evaluatedExpression}`)();
+
+      if (result === null || result === undefined || isNaN(result) || !isFinite(result)) {
+        return "#ERROR";
+      }
+      return String(result);
+
+    } catch (e: any) {
+      if (e.message.startsWith('#')) return e.message;
       return "#ERROR";
     }
   }, [gridData, headers.length]);
@@ -678,5 +667,4 @@ export function CashBookPage() {
     </>
   );
 }
-
     
