@@ -1,22 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useFirebase } from '@/firebase';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { auth } = useFirebase();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) {
+      toast({
+        variant: 'destructive',
+        title: 'Signup Failed',
+        description: 'Authentication service not ready.',
+      });
+      return;
+    }
     if (!email || !password) {
       toast({
         variant: 'destructive',
@@ -28,7 +38,6 @@ export default function SignupPage() {
 
     setIsLoading(true);
     try {
-      const auth = getAuth();
       await createUserWithEmailAndPassword(auth, email, password);
       // Auth state change will be handled by the AuthWrapper, which will redirect.
     } catch (error: any) {
