@@ -7,11 +7,14 @@ import { collection, Timestamp } from 'firebase/firestore';
 import { Task, Transaction } from '@/lib/types';
 import { getThisMonthTransactions, getOverdueTasks } from '@/lib/helpers';
 import { AIAlerts } from './AIAlerts';
+import { useToast } from '@/hooks/use-toast';
 
 export function AIAlertsWrapper() {
   const { firestore, user } = useFirebase();
+  const { toast } = useToast();
   const [alerts, setAlerts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasFetchedAlerts, setHasFetchedAlerts] = useState(false);
 
   const incomeQuery = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
@@ -42,10 +45,13 @@ export function AIAlertsWrapper() {
 
   useEffect(() => {
     async function fetchAlerts() {
-      if (isLoadingIncome || isLoadingExpenses || isLoadingTasks || !user) {
-        // We also need to wait for the user to be loaded
+      // Prevent fetching if already fetched, or if data is still loading
+      if (hasFetchedAlerts || isLoadingIncome || isLoadingExpenses || isLoadingTasks || !user) {
         return;
       }
+
+      setIsLoading(true);
+      setHasFetchedAlerts(true); // Mark that we've started the fetch process
 
       const monthlyTransactions = getThisMonthTransactions(transactionsWithDates);
       const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -54,7 +60,6 @@ export function AIAlertsWrapper() {
       const overdueTasks = getOverdueTasks(tasksWithDates);
 
       try {
-        setIsLoading(true);
         const alertsData = await generateAlerts({
           cashBalance: totalBalance,
           overdueTasksCount: overdueTasks.length,
@@ -69,13 +74,18 @@ export function AIAlertsWrapper() {
       } catch (error) {
         console.error('AIAlerts Error:', error);
         setAlerts([]);
+        toast({
+          variant: "destructive",
+          title: "AI Alerts Failed",
+          description: "Could not load alerts. You may have exceeded your usage quota.",
+        });
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchAlerts();
-  }, [isLoadingIncome, isLoadingExpenses, isLoadingTasks, transactionsWithDates, tasksWithDates, user]);
+  }, [hasFetchedAlerts, isLoadingIncome, isLoadingExpenses, isLoadingTasks, transactionsWithDates, tasksWithDates, user, toast]);
 
   return <AIAlerts alerts={alerts} isLoading={isLoading || isLoadingIncome || isLoadingExpenses || isLoadingTasks} />;
 }
