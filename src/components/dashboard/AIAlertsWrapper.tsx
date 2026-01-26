@@ -14,7 +14,7 @@ export function AIAlertsWrapper() {
   const { toast } = useToast();
   const [alerts, setAlerts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasFetchedAlerts, setHasFetchedAlerts] = useState(false);
+  const [hasRun, setHasRun] = useState(false); // Use this to run only once per mount
 
   const incomeQuery = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
@@ -44,48 +44,61 @@ export function AIAlertsWrapper() {
   const tasksWithDates = useMemo(() => tasks?.map(t => ({...t, dueDate: t.dueDate.toDate()})) || [], [tasks]);
 
   useEffect(() => {
-    async function fetchAlerts() {
-      // Prevent fetching if already fetched, or if data is still loading
-      if (hasFetchedAlerts || isLoadingIncome || isLoadingExpenses || isLoadingTasks || !user) {
-        return;
-      }
+    const isDataLoaded = !isLoadingIncome && !isLoadingExpenses && !isLoadingTasks && !!user;
+    
+    // Only run the fetch logic if the initial data is loaded and we haven't run it yet for this component mount.
+    if (isDataLoaded && !hasRun) {
+      setHasRun(true); // Prevent re-running on subsequent data changes
 
-      setIsLoading(true);
-      setHasFetchedAlerts(true); // Mark that we've started the fetch process
+      const fetchAlerts = async () => {
+        setIsLoading(true);
 
-      const monthlyTransactions = getThisMonthTransactions(transactionsWithDates);
-      const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-      const monthlyExpenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-      const totalBalance = transactionsWithDates.reduce((balance, t) => balance + (t.type === 'income' ? t.amount : -t.amount), 0);
-      const overdueTasks = getOverdueTasks(tasksWithDates);
+        const monthlyTransactions = getThisMonthTransactions(transactionsWithDates);
+        const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const monthlyExpenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        const totalBalance = transactionsWithDates.reduce((balance, t) => balance + (t.type === 'income' ? t.amount : -t.amount), 0);
+        const overdueTasks = getOverdueTasks(tasksWithDates);
 
-      try {
-        const alertsData = await generateAlerts({
-          cashBalance: totalBalance,
-          overdueTasksCount: overdueTasks.length,
-          totalTasksCount: tasksWithDates.length,
-          unpaidInvoices: 0, // This can be updated to use real data later
-          monthlyIncome: monthlyIncome,
-          monthlyExpenses: monthlyExpenses,
-        });
-        if (alertsData.alerts) {
-          setAlerts(alertsData.alerts);
+        try {
+          const alertsData = await generateAlerts({
+            cashBalance: totalBalance,
+            overdueTasksCount: overdueTasks.length,
+            totalTasksCount: tasksWithDates.length,
+            unpaidInvoices: 0, // This can be updated to use real data later
+            monthlyIncome: monthlyIncome,
+            monthlyExpenses: monthlyExpenses,
+          });
+          if (alertsData.alerts) {
+            setAlerts(alertsData.alerts);
+          }
+        } catch (error) {
+          console.error('AIAlerts Error:', error);
+          setAlerts([]);
+          toast({
+            variant: "destructive",
+            title: "AI Alerts Failed",
+            description: "Could not load alerts. You may have exceeded your usage quota.",
+          });
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error('AIAlerts Error:', error);
-        setAlerts([]);
-        toast({
-          variant: "destructive",
-          title: "AI Alerts Failed",
-          description: "Could not load alerts. You may have exceeded your usage quota.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
+      };
+
+      fetchAlerts();
     }
+  }, [
+    hasRun, // Dependency to prevent re-run
+    isLoadingIncome,
+    isLoadingExpenses,
+    isLoadingTasks,
+    user,
+    transactionsWithDates, // Dependency to get latest data when effect runs
+    tasksWithDates,       // Dependency to get latest data when effect runs
+    toast
+  ]);
 
-    fetchAlerts();
-  }, [hasFetchedAlerts, isLoadingIncome, isLoadingExpenses, isLoadingTasks, transactionsWithDates, tasksWithDates, user, toast]);
+  // The component is loading if the underlying data is loading, OR if the AI fetch is in progress.
+  const isComponentLoading = isLoading || isLoadingIncome || isLoadingExpenses || isLoadingTasks;
 
-  return <AIAlerts alerts={alerts} isLoading={isLoading || isLoadingIncome || isLoadingExpenses || isLoadingTasks} />;
+  return <AIAlerts alerts={alerts} isLoading={isComponentLoading} />;
 }
