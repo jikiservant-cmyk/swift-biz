@@ -47,6 +47,123 @@ export function CashBookPage() {
   );
   const { data: cashbookData, isLoading: isCashbookLoading } = useDoc<CashBook>(cashbookDocRef);
 
+  const evaluatorRef = useRef<(formula: string, visited?: Set<string>) => string>();
+
+  const getColumnName = (index: number) => {
+    let name = '';
+    let tempIndex = index;
+    while (tempIndex >= 0) {
+        name = String.fromCharCode((tempIndex % 26) + 'A'.charCodeAt(0)) + name;
+        tempIndex = Math.floor(tempIndex / 26) - 1;
+    }
+    return name;
+  }
+
+  const evaluateFormula = useCallback((formula: string, visited = new Set<string>()): string => {
+    if (!evaluatorRef.current) return '#ERROR';
+
+    if (!formula || !formula.startsWith('=')) {
+        return formula;
+    }
+
+    const colToIdx = (col: string): number => {
+        let index = 0;
+        for (let i = 0; i < col.length; i++) {
+            index = index * 26 + (col.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
+        }
+        return index - 1;
+    };
+
+    const getCellValue = (cellId: string, visitedInCall: Set<string>): number => {
+        if (visitedInCall.has(cellId)) throw new Error("#REF!");
+        visitedInCall.add(cellId);
+
+        const colLetters = cellId.match(/[A-Z]+/)?.[0];
+        const rowNumStr = cellId.match(/\d+/)?.[0];
+        
+        if (!colLetters || !rowNumStr) throw new Error("#NAME?");
+
+        const colIndex = colToIdx(colLetters);
+        const rowIndex = parseInt(rowNumStr, 10) - 1;
+
+        if (rowIndex < 0 || rowIndex >= gridData.length || colIndex < 0 || colIndex >= headers.length) {
+          return 0;
+        }
+
+        const rawValue = gridData[rowIndex]?.[colIndex] || '0';
+        const result = evaluatorRef.current(rawValue, new Set(visitedInCall));
+        
+        const num = Number(result);
+        return isNaN(num) ? 0 : num;
+    };
+
+    const getRangeValues = (range: string, visitedInCall: Set<string>): number[] => {
+        const [startCell, endCell] = range.split(':');
+        if (!endCell) throw new Error("#NAME?");
+
+        const startColLetters = startCell.match(/[A-Z]+/)?.[0];
+        const startRowNumStr = startCell.match(/\d+/)?.[0];
+        const endColLetters = endCell.match(/[A-Z]+/)?.[0];
+        const endRowNumStr = endCell.match(/\d+/)?.[0];
+
+        if (!startColLetters || !startRowNumStr || !endColLetters || !endRowNumStr) throw new Error("#NAME?");
+
+        const startCol = colToIdx(startColLetters);
+        const startRow = parseInt(startRowNumStr, 10) - 1;
+        const endCol = colToIdx(endColLetters);
+        const endRow = parseInt(endRowNumStr, 10) - 1;
+
+        const values: number[] = [];
+        for (let r = Math.min(startRow, endRow); r <= Math.max(startRow, endRow); r++) {
+            for (let c = Math.min(startCol, endCol); c <= Math.max(startCol, endCol); c++) {
+                const cellId = `${getColumnName(c)}${r + 1}`;
+                values.push(getCellValue(cellId, visitedInCall));
+            }
+        }
+        return values;
+    };
+  
+    let expression = formula.substring(1).toUpperCase();
+  
+    try {
+      const functionRegex = /(SUM|AVERAGE)\(([A-Z0-9:]+)\)/g;
+      expression = expression.replace(functionRegex, (match, functionName, range) => {
+          const values = getRangeValues(range, visited);
+          if (functionName === 'SUM') {
+              return String(values.reduce((acc, val) => acc + val, 0));
+          }
+          if (functionName === 'AVERAGE') {
+              if (values.length === 0) return '0';
+              const sum = values.reduce((acc, val) => acc + val, 0);
+              return String(sum / values.length);
+          }
+          return match;
+      });
+
+      const cellRefRegex = /[A-Z]+\d+/g;
+      expression = expression.replace(cellRefRegex, (cellId) => {
+        return String(getCellValue(cellId, visited));
+      });
+      
+      if (/[A-DF-Z]/i.test(expression)) {
+          throw new Error("#NAME?");
+      }
+
+      const result = new Function(`return ${expression}`)();
+
+      if (result === null || result === undefined || !isFinite(result)) {
+        return "#DIV/0!";
+      }
+      return String(result);
+
+    } catch (e: any) {
+      if (e.message.startsWith('#')) return e.message;
+      return "#ERROR";
+    }
+  }, [gridData, headers.length]);
+
+  evaluatorRef.current = evaluateFormula;
+
   useEffect(() => {
     if (cashbookData) {
       const loadedHeaders = cashbookData.headers || ["Header 1", "Header 2", "Header 3"];
@@ -81,77 +198,6 @@ export function CashBookPage() {
       ]);
     }
   }, [cashbookData, isCashbookLoading]);
-
-
-  const colToIdx = (col: string): number => {
-    let index = 0;
-    for (let i = 0; i < col.length; i++) {
-        index = index * 26 + (col.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
-    }
-    return index - 1;
-  };
-
-  const evaluateFormula = useCallback((formula: string, visited = new Set<string>()): string => {
-    if (!formula || !formula.startsWith('=')) {
-      return formula;
-    }
-  
-    const expression = formula.substring(1).toUpperCase();
-  
-    const cellRefRegex = /[A-Z]+\d+/g;
-    
-    try {
-      const evaluatedExpression = expression.replace(cellRefRegex, (match) => {
-        const cellId = match;
-  
-        if (visited.has(cellId)) {
-          throw new Error("#REF!");
-        }
-        visited.add(cellId);
-  
-        const colLetters = cellId.match(/[A-Z]+/)?.[0];
-        const rowNumStr = cellId.match(/\d+/)?.[0];
-        
-        if (!colLetters || !rowNumStr) {
-            throw new Error("#NAME?");
-        }
-  
-        const colIndex = colToIdx(colLetters);
-        const rowIndex = parseInt(rowNumStr, 10) - 1;
-  
-        if (rowIndex < 0 || rowIndex >= gridData.length || colIndex < 0 || colIndex >= headers.length) {
-          return '0'; // Out of bounds is 0
-        }
-  
-        const cellValue = gridData[rowIndex]?.[colIndex] || '0';
-  
-        if (cellValue.startsWith('=')) {
-          const result = evaluateFormula(cellValue, new Set(visited));
-           visited.delete(cellId); // Allow re-evaluation of the same cell in different contexts
-           return result;
-        }
-        
-        const num = Number(cellValue.trim());
-        return isNaN(num) ? '0' : String(num);
-      });
-      
-      if (/[A-Z]/i.test(evaluatedExpression.replace(/"[^"]*"/g, ''))) {
-          throw new Error("#NAME?");
-      }
-
-      const result = new Function(`return ${evaluatedExpression}`)();
-
-      if (result === null || result === undefined || isNaN(result) || !isFinite(result)) {
-        return "#ERROR";
-      }
-      return String(result);
-
-    } catch (e: any) {
-      if (e.message.startsWith('#')) return e.message;
-      return "#ERROR";
-    }
-  }, [gridData, headers.length]);
-
 
   useEffect(() => {
     const newViewData = gridData.map(row => 
@@ -277,17 +323,6 @@ export function CashBookPage() {
     };
     reader.readAsArrayBuffer(file);
   };
-
-
-  const getColumnName = (index: number) => {
-      let name = '';
-      let tempIndex = index;
-      while (tempIndex >= 0) {
-          name = String.fromCharCode((tempIndex % 26) + 'A'.charCodeAt(0)) + name;
-          tempIndex = Math.floor(tempIndex / 26) - 1;
-      }
-      return name;
-  }
 
   const toggleRowSelection = (rowIndex: number) => {
     const newSelection = new Set(selectedRows);
@@ -672,4 +707,3 @@ export function CashBookPage() {
     </>
   );
 }
-    
