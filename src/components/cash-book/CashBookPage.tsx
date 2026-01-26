@@ -351,11 +351,6 @@ export function CashBookPage() {
   }, [isChartVisible, selectedRows, selectedCols, viewData, headers, chartType, toast]);
 
   const runAiAnalysis = useCallback(async () => {
-    if (!isAiAnalysisVisible || selectedRows.size === 0 || selectedCols.size === 0) {
-        setAiAnalysis(null);
-        return;
-    }
-
     const selCols = Array.from(selectedCols).sort((a, b) => a - b);
     const selectedData = Array.from(selectedRows).map(rowIndex => {
         const row = viewData[rowIndex];
@@ -374,21 +369,26 @@ export function CashBookPage() {
     }
 
     setIsAnalyzing(true);
+    setAiAnalysis(null);
     try {
       const result = await analyzeCashBookData({ jsonData: JSON.stringify(selectedData, null, 2) });
       setAiAnalysis(result.analysis);
     } catch (e) {
       console.error(e);
+      toast({
+          title: "AI Analysis Failed",
+          description: "Could not generate analysis. You may have exceeded your usage quota.",
+          variant: "destructive",
+      });
       setAiAnalysis("There was an error while analyzing the data.");
     } finally {
       setIsAnalyzing(false);
     }
-  }, [isAiAnalysisVisible, selectedRows, selectedCols, headers, viewData]);
+  }, [selectedRows, selectedCols, headers, viewData, toast]);
   
   useEffect(() => {
     generateChartData();
-    runAiAnalysis();
-  }, [viewData, selectedRows, selectedCols, isChartVisible, isAiAnalysisVisible, generateChartData, runAiAnalysis]);
+  }, [viewData, selectedRows, selectedCols, isChartVisible, generateChartData]);
 
 
   const chartColors = useMemo(() => ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", "#FFBB28", "#FF8042"], []);
@@ -480,16 +480,21 @@ export function CashBookPage() {
     setIsChartVisible(prev => !prev);
   };
 
-  const handleToggleAiAnalysis = () => {
-     if (!isAiAnalysisVisible && (selectedRows.size === 0 || selectedCols.size === 0)) {
-      toast({
-        title: "No data selected",
-        description: "Please select some rows and columns to analyze.",
-        variant: "destructive"
-      });
-      return;
+  const handleAnalysisClick = () => {
+    if (isAiAnalysisVisible) {
+        setIsAiAnalysisVisible(false);
+    } else {
+        if (selectedRows.size === 0 || selectedCols.size === 0) {
+            toast({
+                title: "No data selected",
+                description: "Please select some rows and columns to analyze.",
+                variant: "destructive"
+            });
+            return;
+        }
+        setIsAiAnalysisVisible(true);
+        runAiAnalysis();
     }
-    setIsAiAnalysisVisible(prev => !prev);
   };
 
 
@@ -543,7 +548,7 @@ export function CashBookPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
-             <Button onClick={handleToggleAiAnalysis} disabled={isAnalyzing}>
+             <Button onClick={handleAnalysisClick} disabled={isAnalyzing}>
               <Wand2 className="mr-2 h-4 w-4" /> {isAiAnalysisVisible ? 'Hide Analysis' : 'Analyze with AI'}
             </Button>
           </div>
@@ -642,7 +647,7 @@ export function CashBookPage() {
                   <Wand2 className="h-5 w-5 text-primary" /> AI Analysis
                 </CardTitle>
                 <CardDescription>
-                    AI-powered insights based on your selected data. This analysis updates in real-time as you edit the grid.
+                    AI-powered insights based on your selected data. Click "Analyze with AI" to refresh the analysis.
                 </CardDescription>
             </CardHeader>
             <CardContent>
