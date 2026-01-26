@@ -87,14 +87,14 @@ export function AIAlertsWrapper() {
       fetchAlerts();
     }
   }, [
-    hasRun, // Dependency to prevent re-run
+    hasRun,
     isLoadingIncome,
     isLoadingExpenses,
     isLoadingTasks,
     user,
-    transactionsWithDates, // Dependency to get latest data when effect runs
-    tasksWithDates,       // Dependency to get latest data when effect runs
-    toast
+    toast,
+    transactionsWithDates,
+    tasksWithDates
   ]);
 
   // The component is loading if the underlying data is loading, OR if the AI fetch is in progress.
