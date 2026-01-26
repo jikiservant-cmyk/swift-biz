@@ -83,44 +83,65 @@ export function CashBookPage() {
   }, [cashbookData, isCashbookLoading]);
 
 
-  const getCellValue = useCallback((cellId: string): number => {
-    const colChar = cellId.match(/[A-Z]+/)?.[0];
-    const rowNum = cellId.match(/\d+/)?.[0];
-    
-    if (!colChar || !rowNum) return NaN;
-
-    const colIndex = colChar.charCodeAt(0) - 'A'.charCodeAt(0);
-    const rowIndex = parseInt(rowNum, 10) - 1;
-
-    if (rowIndex >= 0 && rowIndex < gridData.length && colIndex >= 0 && colIndex < headers.length) {
-      const cellValue = gridData[rowIndex][colIndex];
-      if (cellValue.startsWith('=')) {
-          return NaN; 
-      }
-      const num = parseFloat(cellValue);
-      return isNaN(num) ? 0 : num;
+  const colToIdx = (col: string): number => {
+    let index = 0;
+    for (let i = 0; i < col.length; i++) {
+        index = index * 26 + (col.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
     }
-    return NaN;
-  }, [gridData, headers.length]);
+    return index - 1;
+  };
 
-
-  const evaluateFormula = useCallback((formula: string): string => {
-    if (!formula.startsWith('=')) return formula;
+  const evaluateFormula = useCallback((formula: string, visited = new Set<string>()): string => {
+    if (!formula || !formula.startsWith('=')) return formula;
 
     let expression = formula.substring(1);
 
-    expression = expression.replace(/[A-Z]+\d+/g, (match) => {
-        const value = getCellValue(match);
-        return isNaN(value) ? '0' : value.toString();
+    // Regex to find cell references like A1, B12, AA7
+    expression = expression.replace(/[A-Z]+\d+/g, (cellId) => {
+        if (visited.has(cellId)) {
+            // Circular dependency detected
+            return "0"; 
+        }
+        visited.add(cellId);
+
+        const colLetters = cellId.match(/[A-Z]+/)?.[0];
+        const rowNumStr = cellId.match(/\d+/)?.[0];
+        
+        if (!colLetters || !rowNumStr) return '0';
+
+        const colIndex = colToIdx(colLetters);
+        const rowIndex = parseInt(rowNumStr, 10) - 1;
+
+        if (rowIndex >= 0 && rowIndex < gridData.length && colIndex >= 0 && colIndex < headers.length) {
+            const cellValue = gridData[rowIndex][colIndex];
+            
+            // If the referenced cell is also a formula, recursively evaluate it
+            if (cellValue && cellValue.startsWith('=')) {
+                // Pass a copy of the visited set to correctly track paths
+                const evaluatedValue = evaluateFormula(cellValue, new Set(visited));
+                // Check if the result is a number before returning
+                const num = parseFloat(evaluatedValue);
+                return isNaN(num) ? '0' : evaluatedValue;
+            }
+            
+            // If it's a plain value, parse it
+            const num = parseFloat(cellValue);
+            return isNaN(num) ? '0' : cellValue;
+        }
+        
+        // If cell is out of bounds
+        return '0';
     });
 
     try {
       const result = new Function(`return ${expression}`)();
-      return String(result);
+      // handle cases where result is null or undefined
+      return result != null ? String(result) : "0";
     } catch (e) {
       return "#ERROR";
     }
-  }, [getCellValue]);
+  }, [gridData, headers.length]);
+
 
   useEffect(() => {
     const newViewData = gridData.map(row => 
@@ -242,7 +263,13 @@ export function CashBookPage() {
 
 
   const getColumnName = (index: number) => {
-      return String.fromCharCode('A'.charCodeAt(0) + index);
+      let name = '';
+      let tempIndex = index;
+      while (tempIndex >= 0) {
+          name = String.fromCharCode((tempIndex % 26) + 'A'.charCodeAt(0)) + name;
+          tempIndex = Math.floor(tempIndex / 26) - 1;
+      }
+      return name;
   }
 
   const toggleRowSelection = (rowIndex: number) => {
