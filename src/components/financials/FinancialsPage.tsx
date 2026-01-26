@@ -161,7 +161,6 @@ export function FinancialsPage() {
         });
         setAiAnalysis(result.analysis);
     } catch (e) {
-        console.error(e);
         toast({
             title: "AI Analysis Failed",
             description: "Could not generate analysis. You may have exceeded your usage quota.",
