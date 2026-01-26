@@ -55,12 +55,7 @@ const cashBookAnalysisFlow = ai.defineFlow(
     outputSchema: CashBookAnalysisOutputSchema,
   },
   async input => {
-    try {
-      const {output} = await analysisPrompt(input);
-      return output!;
-    } catch (e) {
-      console.error('Error generating analysis:', e);
-      return { analysis: 'Sorry, I was unable to analyze the data at this moment.' };
-    }
+    const {output} = await analysisPrompt(input);
+    return output!;
   }
 );
