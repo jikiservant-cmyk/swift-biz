@@ -41,11 +41,16 @@ export default function SignupPage() {
       await createUserWithEmailAndPassword(auth, email, password);
       // Auth state change will be handled by the AuthWrapper, which will redirect.
     } catch (error: any) {
-      console.error("Signup failed:", error);
+      let description = 'An unexpected error occurred.';
+      if (error.code === 'auth/email-already-in-use') {
+        description = 'This email address is already in use. Please try logging in instead.';
+      } else {
+        description = error.message;
+      }
       toast({
         variant: 'destructive',
         title: 'Signup Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: description,
       });
     } finally {
       setIsLoading(false);

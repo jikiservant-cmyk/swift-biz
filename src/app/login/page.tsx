@@ -41,7 +41,6 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
       // Auth state change will be handled by the AuthWrapper, which will redirect.
     } catch (error: any) {
-      console.error("Login failed:", error);
       toast({
         variant: 'destructive',
         title: 'Login Failed',
