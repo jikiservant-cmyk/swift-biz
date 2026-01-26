@@ -3,7 +3,7 @@
 
 import { Suspense, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { AIAlertsWrapper } from "@/components/dashboard/AIAlertsWrapper";
+import { AIAlerts } from "@/components/dashboard/AIAlerts";
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,7 +68,7 @@ export default function Home() {
         }
       />
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        <AIAlertsWrapper />
+        <AIAlerts />
       </Suspense>
       <OverviewCards />
       <div className="mt-8">
