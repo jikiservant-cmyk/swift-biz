@@ -17,8 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Transaction } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, doc, Timestamp } from "firebase/firestore";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, Timestamp, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart as BarChartIcon, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from 'lucide-react';
@@ -75,7 +74,7 @@ export function FinancialsPage() {
     setDialogState({ isOpen: true, type, editingTransaction: transaction });
   };
   
-  const handleSaveTransaction = (txData: Omit<Transaction, 'id' | 'date' | 'userId'> & { id?: string, date?: Date }) => {
+  const handleSaveTransaction = async (txData: Omit<Transaction, 'id' | 'date' | 'userId'> & { id?: string, date?: Date }) => {
     if (!firestore || !user) return;
     
     const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
@@ -86,25 +85,43 @@ export function FinancialsPage() {
       userId: user.uid,
     };
     
-    if (txData.id) { // Editing
-      const txRef = doc(firestore, 'users', user.uid, collectionName, txData.id);
-      updateDocumentNonBlocking(txRef, txPayload);
-      toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
-    } else { // Creating
-      delete txPayload.id;
-      const txCol = collection(firestore, 'users', user.uid, collectionName);
-      addDocumentNonBlocking(txCol, txPayload);
-      toast({ title: "Transaction added", description: "A new transaction has been recorded." });
+    try {
+      if (txData.id) { // Editing
+        const txRef = doc(firestore, 'users', user.uid, collectionName, txData.id);
+        await updateDoc(txRef, txPayload);
+        toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
+      } else { // Creating
+        delete txPayload.id;
+        const txCol = collection(firestore, 'users', user.uid, collectionName);
+        await addDoc(txCol, txPayload);
+        toast({ title: "Transaction added", description: "A new transaction has been recorded." });
+      }
+      setDialogState({ isOpen: false, type: 'income', editingTransaction: null });
+    } catch (error: any) {
+      console.error("Failed to save transaction:", error);
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: error.message || "Could not save the transaction.",
+      });
     }
-    setDialogState({ isOpen: false, type: 'income', editingTransaction: null });
   };
   
-  const handleDeleteTransaction = (tx: Transaction) => {
+  const handleDeleteTransaction = async (tx: Transaction) => {
     if(!firestore || !user) return;
     const collectionName = tx.type === 'income' ? 'incomes' : 'expenses';
     const txRef = doc(firestore, 'users', user.uid, collectionName, tx.id);
-    deleteDocumentNonBlocking(txRef);
-    toast({ title: "Transaction deleted", variant: "destructive", description: "The transaction has been removed." });
+    try {
+      await deleteDoc(txRef);
+      toast({ title: "Transaction deleted", description: "The transaction has been removed." });
+    } catch (error: any) {
+       console.error("Failed to delete transaction:", error);
+       toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: error.message || "Could not remove the transaction.",
+      });
+    }
   };
 
   const chartData = [
@@ -118,7 +135,7 @@ export function FinancialsPage() {
   const renderChart = () => {
     const commonProps = {
       data: chartData,
-      margin: { top: 5, right: 20, left: 30, bottom: 5 },
+      margin: { top: 5, right: 30, left: 20, bottom: 5 },
     };
     const commonComps = (
       <>
