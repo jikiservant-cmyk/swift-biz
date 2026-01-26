@@ -176,6 +176,13 @@ export function CashBookPage() {
   const handleCellBlur = (e: React.FocusEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
      e.target.value = viewData[rowIndex]?.[colIndex] ?? '';
   };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.currentTarget.blur();
+    }
+  };
 
 
   const addRow = () => {
@@ -581,6 +588,7 @@ export function CashBookPage() {
                           onFocus={(e) => handleCellFocus(e, rowIndex, colIndex)}
                           onBlur={(e) => handleCellBlur(e, rowIndex, colIndex)}
                           onChange={(e) => handleCellChange(e, rowIndex, colIndex)}
+                          onKeyDown={handleKeyDown}
                           placeholder={`${getColumnName(colIndex)}${rowIndex + 1}`}
                           className={selectedRows.has(rowIndex) || selectedCols.has(colIndex) ? 'bg-accent/20' : ''}
                         />
