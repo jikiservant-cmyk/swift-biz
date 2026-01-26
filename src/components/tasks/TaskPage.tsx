@@ -22,8 +22,7 @@ import { Task, User, Client } from '@/lib/types';
 import { formatDate } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, doc, query, where, Timestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { users as staticUsers } from '@/lib/data'; 
 
 type TaskFilter = 'all' | 'today' | 'overdue' | 'completed';
@@ -71,7 +70,7 @@ export function TaskPage() {
     setIsDialogOpen(true);
   };
 
-  const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
+  const handleSaveTask = async (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
     if (!firestore || !user) return;
 
     const taskPayload : any = {
@@ -80,27 +79,45 @@ export function TaskPage() {
       userId: user.uid,
     };
 
-    if (taskData.id) {
-      // Editing
-      const taskRef = doc(firestore, 'users', user.uid, 'tasks', taskData.id);
-      updateDocumentNonBlocking(taskRef, taskPayload);
-      toast({ title: 'Task updated', description: 'The task has been successfully updated.' });
-    } else {
-      // Creating
-      delete taskPayload.id;
-      const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
-      addDocumentNonBlocking(tasksCol, taskPayload);
-      toast({ title: 'Task created', description: 'A new task has been added to your list.' });
+    try {
+      if (taskData.id) {
+        // Editing
+        const taskRef = doc(firestore, 'users', user.uid, 'tasks', taskData.id);
+        await updateDoc(taskRef, taskPayload);
+        toast({ title: 'Task updated', description: 'The task has been successfully updated.' });
+      } else {
+        // Creating
+        delete taskPayload.id;
+        const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
+        await addDoc(tasksCol, taskPayload);
+        toast({ title: 'Task created', description: 'A new task has been added to your list.' });
+      }
+      setIsDialogOpen(false);
+      setEditingTask(null);
+    } catch (error: any) {
+      console.error("Failed to save task:", error);
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: error.message || "Could not save the task.",
+      });
     }
-    setIsDialogOpen(false);
-    setEditingTask(null);
   };
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     if (!firestore || !user) return;
-    const taskRef = doc(firestore, 'users', user.uid, 'tasks', taskId);
-    deleteDocumentNonBlocking(taskRef);
-    toast({ title: 'Task deleted', variant: 'destructive', description: 'The task has been removed.' });
+    try {
+      const taskRef = doc(firestore, 'users', user.uid, 'tasks', taskId);
+      await deleteDoc(taskRef);
+      toast({ title: 'Task deleted', variant: 'destructive', description: 'The task has been removed.' });
+    } catch (error: any) {
+      console.error("Failed to delete task:", error);
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: error.message || "Could not delete the task.",
+      });
+    }
   };
 
   return (

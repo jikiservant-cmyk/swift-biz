@@ -11,11 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { TaskFormDialog } from "@/components/tasks/TaskPage";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, query, where, Timestamp } from "firebase/firestore";
+import { collection, query, where, Timestamp, addDoc } from "firebase/firestore";
 import { Client, Task } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { users as staticUsers } from '@/lib/data';
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 
 export default function Home() {
@@ -29,7 +28,7 @@ export default function Home() {
   );
   const { data: clients } = useCollection<Client>(clientsQuery);
 
-  const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
+  const handleSaveTask = async (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
     if (!firestore || !user) return;
 
     const taskPayload : any = {
@@ -38,16 +37,23 @@ export default function Home() {
       userId: user.uid,
     };
     
-    // Firestore's addDoc fails if an 'id' field is present but undefined.
-    // When creating a new document, we must remove it.
     if ('id' in taskPayload) {
         delete taskPayload.id;
     }
 
-    const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
-    addDocumentNonBlocking(tasksCol, taskPayload);
-    toast({ title: 'Task created', description: 'A new task has been added to your list.' });
-    setIsTaskDialogOpen(false);
+    try {
+      const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
+      await addDoc(tasksCol, taskPayload);
+      toast({ title: 'Task created', description: 'A new task has been added to your list.' });
+      setIsTaskDialogOpen(false);
+    } catch (error: any) {
+      console.error("Failed to create task:", error);
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: error.message || "Could not create the task.",
+      });
+    }
   };
 
   return (

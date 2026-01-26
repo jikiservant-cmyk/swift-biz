@@ -19,7 +19,6 @@ import * as XLSX from 'xlsx';
 import { useDoc, useFirebase, useMemoFirebase } from "@/firebase";
 import type { CashBook } from "@/lib/types";
 import { doc, setDoc } from "firebase/firestore";
-import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 type ChartType = "bar" | "line" | "area" | "pie";
 
@@ -167,7 +166,7 @@ export function CashBookPage() {
     setGridData(gridData.map(row => [...row, ""]));
   };
 
-  const saveData = useCallback(() => {
+  const saveData = useCallback(async () => {
     if (!cashbookDocRef) return;
     
     const gridDataForFirestore = gridData.map(row => {
@@ -188,8 +187,17 @@ export function CashBookPage() {
       isAiAnalysisVisible,
     };
     
-    setDocumentNonBlocking(cashbookDocRef, dataToSync, { merge: true });
-  }, [cashbookDocRef, gridData, headers, selectedRows, selectedCols, chartType, isChartVisible, isAiAnalysisVisible]);
+    try {
+      await setDoc(cashbookDocRef, dataToSync, { merge: true });
+    } catch (error: any) {
+      console.error("Failed to save cash book data:", error);
+      toast({
+        variant: "destructive",
+        title: "Sync Failed",
+        description: "Your changes could not be saved. Please check your connection.",
+      });
+    }
+  }, [cashbookDocRef, gridData, headers, selectedRows, selectedCols, chartType, isChartVisible, isAiAnalysisVisible, toast]);
   
   useEffect(() => {
     if (isCashbookLoading) return;

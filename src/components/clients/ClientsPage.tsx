@@ -11,14 +11,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Client, Task } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
+import { collection, doc, query, where, Timestamp, addDoc, updateDoc } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { sendSms } from '@/ai/flows/send-sms-flow';
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export function ClientsPage() {
   const { firestore, user } = useFirebase();
@@ -50,28 +49,37 @@ export function ClientsPage() {
     setIsClientDialogOpen(true);
   };
 
-  const handleSaveClient = (formData: Omit<Client, 'id' | 'members'> & { id?: string }) => {
+  const handleSaveClient = async (formData: Omit<Client, 'id' | 'members'> & { id?: string }) => {
     if (!user || !firestore) return;
-    
-    if (formData.id) {
-      // Editing: Update only the fields from the form
-      const clientRef = doc(firestore, 'clients', formData.id);
-      const { id, ...updatePayload } = formData;
-      updateDocumentNonBlocking(clientRef, updatePayload);
-      toast({ title: 'Client updated' });
-    } else {
-      // Creating: Add new client with the current user as owner
-      const clientPayload = { 
-        ...formData, 
-        members: {
+
+    try {
+      if (formData.id) {
+        // Editing: Update only the fields from the form
+        const clientRef = doc(firestore, 'clients', formData.id);
+        const { id, ...updatePayload } = formData;
+        await updateDoc(clientRef, updatePayload);
+        toast({ title: 'Client updated' });
+      } else {
+        // Creating: Add new client with the current user as owner
+        const clientPayload = {
+          ...formData,
+          members: {
             [user.uid]: 'owner'
-        }
-      };
-      addDocumentNonBlocking(collection(firestore, 'clients'), clientPayload);
-      toast({ title: 'Client added' });
+          }
+        };
+        await addDoc(collection(firestore, 'clients'), clientPayload);
+        toast({ title: 'Client added' });
+      }
+      setIsClientDialogOpen(false);
+      setEditingClient(null);
+    } catch (error: any) {
+      console.error("Failed to save client:", error);
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: error.message || "Could not save the client.",
+      });
     }
-    setIsClientDialogOpen(false);
-    setEditingClient(null);
   };
 
   const handleSendSms = async (message: string) => {
