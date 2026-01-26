@@ -19,7 +19,9 @@ import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection, doc, Timestamp } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BarChart as BarChartIcon, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from 'lucide-react';
 
 
 type TransactionDialogState = {
@@ -28,11 +30,12 @@ type TransactionDialogState = {
   editingTransaction: Transaction | null;
 }
 
+type ChartType = 'bar' | 'line' | 'area';
+
 export function FinancialsPage() {
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
 
-  // Unified query for all transactions
   const incomeQuery = useMemoFirebase(
     () => (user ? collection(firestore, 'users', user.uid, 'incomes') : null),
     [firestore, user]
@@ -57,6 +60,7 @@ export function FinancialsPage() {
 
   const [dialogState, setDialogState] = useState<TransactionDialogState>({ isOpen: false, type: 'income', editingTransaction: null });
   const [activeTab, setActiveTab] = useState("income");
+  const [chartType, setChartType] = useState<ChartType>('bar');
 
   const monthlyTxs = useMemo(() => {
     const now = new Date();
@@ -76,7 +80,7 @@ export function FinancialsPage() {
     
     const collectionName = txData.type === 'income' ? 'incomes' : 'expenses';
     
-    const txPayload: any = {
+    const txPayload : any = {
       ...txData,
       date: txData.date ? Timestamp.fromDate(txData.date) : Timestamp.now(),
       userId: user.uid,
@@ -87,7 +91,7 @@ export function FinancialsPage() {
       updateDocumentNonBlocking(txRef, txPayload);
       toast({ title: "Transaction updated", description: "The transaction has been successfully updated." });
     } else { // Creating
-      delete txPayload.id; // Ensure no 'id' field is present when creating a new doc
+      delete txPayload.id;
       const txCol = collection(firestore, 'users', user.uid, collectionName);
       addDocumentNonBlocking(txCol, txPayload);
       toast({ title: "Transaction added", description: "A new transaction has been recorded." });
@@ -110,6 +114,56 @@ export function FinancialsPage() {
       Expenses: monthlyExpenses,
     },
   ];
+
+  const renderChart = () => {
+    const commonProps = {
+      data: chartData,
+      margin: { top: 5, right: 20, left: 30, bottom: 5 },
+    };
+    const commonComps = (
+      <>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="name" />
+        <YAxis tickFormatter={(value) => formatCurrency(Number(value))} width={80} />
+        <Tooltip 
+          contentStyle={{ 
+              background: "hsl(var(--background))",
+              border: "1px solid hsl(var(--border))"
+          }}
+          formatter={(value: number) => formatCurrency(value)}
+        />
+        <Legend />
+      </>
+    );
+
+    switch(chartType) {
+      case 'line':
+        return (
+          <LineChart {...commonProps}>
+            {commonComps}
+            <Line type="monotone" dataKey="Income" stroke="#22c55e" />
+            <Line type="monotone" dataKey="Expenses" stroke="#ef4444" />
+          </LineChart>
+        );
+      case 'area':
+        return (
+          <AreaChart {...commonProps}>
+            {commonComps}
+            <Area type="monotone" dataKey="Income" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
+            <Area type="monotone" dataKey="Expenses" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+          </AreaChart>
+        );
+      case 'bar':
+      default:
+        return (
+          <BarChart {...commonProps}>
+            {commonComps}
+            <Bar dataKey="Income" fill="#22c55e" />
+            <Bar dataKey="Expenses" fill="#ef4444" />
+          </BarChart>
+        );
+    }
+  };
 
   return (
     <>
@@ -154,26 +208,26 @@ export function FinancialsPage() {
       
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Monthly Summary</CardTitle>
-          <CardDescription>A visual comparison of your income and expenses for the current month.</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Monthly Summary</CardTitle>
+              <CardDescription>A visual comparison of your income and expenses for the current month.</CardDescription>
+            </div>
+            <Select value={chartType} onValueChange={(value) => setChartType(value as ChartType)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select chart type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bar"><div className="flex items-center"><BarChartIcon className="mr-2 h-4 w-4" />Bar Chart</div></SelectItem>
+                <SelectItem value="line"><div className="flex items-center"><LineChartIcon className="mr-2 h-4 w-4" />Line Chart</div></SelectItem>
+                <SelectItem value="area"><div className="flex items-center"><AreaChartIcon className="mr-2 h-4 w-4" />Area Chart</div></SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-              <Tooltip 
-                contentStyle={{ 
-                    background: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))"
-                }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
-              <Legend />
-              <Bar dataKey="Income" fill="#22c55e" />
-              <Bar dataKey="Expenses" fill="#ef4444" />
-            </BarChart>
+            {renderChart()}
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -237,7 +291,8 @@ function TransactionFormDialog({ state, setState, onSave }: { state: Transaction
   }, [state.editingTransaction, state.isOpen]);
 
   const handleSubmit = () => {
-    onSave({ id: state.editingTransaction?.id, type: state.type, description, category, amount: Number(amount), date });
+    const payload = { id: state.editingTransaction?.id, type: state.type, description, category, amount: Number(amount), date };
+    onSave(payload);
   };
   
   const handleOpenChange = (isOpen: boolean) => {

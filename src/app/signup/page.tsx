@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
-import { getAuth } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,11 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!email || !password) {
       toast({
         variant: 'destructive',
@@ -27,14 +26,21 @@ export default function SignupPage() {
       return;
     }
 
-    const auth = getAuth();
-    initiateEmailSignUp(auth, email, password, (error: any) => {
+    setIsLoading(true);
+    try {
+      const auth = getAuth();
+      await createUserWithEmailAndPassword(auth, email, password);
+      // Auth state change will be handled by the AuthWrapper, which will redirect.
+    } catch (error: any) {
+      console.error("Signup failed:", error);
       toast({
         variant: 'destructive',
         title: 'Signup Failed',
         description: error.message || 'An unexpected error occurred.',
       });
-    });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,6 +61,7 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -65,10 +72,11 @@ export default function SignupPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
             </div>
-            <Button type="submit" className="w-full">
-              Create an account
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Creating account...' : 'Create an account'}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

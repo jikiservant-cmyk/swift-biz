@@ -74,30 +74,20 @@ export function TaskPage() {
   const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
     if (!firestore || !user) return;
 
+    const taskPayload : any = {
+      ...taskData,
+      dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
+      userId: user.uid,
+    };
+
     if (taskData.id) {
       // Editing
-      const taskPayload = {
-        ...taskData,
-        dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
-        userId: user.uid,
-      };
       const taskRef = doc(firestore, 'users', user.uid, 'tasks', taskData.id);
       updateDocumentNonBlocking(taskRef, taskPayload);
       toast({ title: 'Task updated', description: 'The task has been successfully updated.' });
     } else {
       // Creating
-      const taskPayload: any = {
-        ...taskData,
-        dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
-        userId: user.uid,
-      };
-      
-      // Firestore's addDoc fails if an 'id' field is present but undefined.
-      // When creating a new document, we must remove it.
-      if (!taskPayload.id) {
-        delete taskPayload.id;
-      }
-
+      delete taskPayload.id;
       const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
       addDocumentNonBlocking(tasksCol, taskPayload);
       toast({ title: 'Task created', description: 'A new task has been added to your list.' });

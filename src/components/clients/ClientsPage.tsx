@@ -12,13 +12,13 @@ import { Separator } from '@/components/ui/separator';
 import { Client, Task } from '@/lib/types';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { sendSms } from '@/ai/flows/send-sms-flow';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export function ClientsPage() {
   const { firestore, user } = useFirebase();
@@ -50,30 +50,24 @@ export function ClientsPage() {
     setIsClientDialogOpen(true);
   };
 
-  const handleSaveClient = (clientData: Omit<Client, 'id'> & { id?: string }) => {
+  const handleSaveClient = (formData: Omit<Client, 'id' | 'members'> & { id?: string }) => {
     if (!user || !firestore) return;
     
-    if (clientData.id) {
-      // Editing
-      const clientPayload = { ...clientData };
-      const clientRef = doc(firestore, 'clients', clientData.id);
-      updateDocumentNonBlocking(clientRef, clientPayload);
+    if (formData.id) {
+      // Editing: Update only the fields from the form
+      const clientRef = doc(firestore, 'clients', formData.id);
+      const { id, ...updatePayload } = formData;
+      updateDocumentNonBlocking(clientRef, updatePayload);
       toast({ title: 'Client updated' });
     } else {
-      // Creating
-      const clientPayload: any = { 
-        ...clientData, 
+      // Creating: Add new client with the current user as owner
+      const clientPayload = { 
+        ...formData, 
         members: {
             [user.uid]: 'owner'
         }
       };
-      // Firestore's addDoc fails if an 'id' field is present but undefined.
-      // When creating a new document, we must remove it.
-      if (!clientPayload.id) {
-          delete clientPayload.id;
-      }
-      const clientsCol = collection(firestore, 'clients');
-      addDocumentNonBlocking(clientsCol, clientPayload);
+      addDocumentNonBlocking(collection(firestore, 'clients'), clientPayload);
       toast({ title: 'Client added' });
     }
     setIsClientDialogOpen(false);
@@ -330,5 +324,3 @@ function BulkSmsDialog({ isOpen, setIsOpen, onSend, isSending }: { isOpen: boole
     </Dialog>
   );
 }
-
-    

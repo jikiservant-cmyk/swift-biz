@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Save, BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon, Wand2, Upload, PieChart as PieChartIcon } from "lucide-react";
+import { Plus, Wand2, Upload, PieChart as PieChartIcon } from "lucide-react";
+import { BarChart, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
 import { useDoc, useFirebase, useMemoFirebase } from "@/firebase";
 import type { CashBook } from "@/lib/types";
-import { doc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 type ChartType = "bar" | "line" | "area" | "pie";
@@ -31,7 +32,6 @@ export function CashBookPage() {
   const [gridData, setGridData] = useState<string[][]>([]);
   const [viewData, setViewData] = useState<string[][]>([]);
   
-  // These states are now primarily for local interaction, but will be synced with Firestore.
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [selectedCols, setSelectedCols] = useState<Set<number>>(new Set());
   const [chartType, setChartType] = useState<ChartType>("bar");
@@ -48,7 +48,6 @@ export function CashBookPage() {
   );
   const { data: cashbookData, isLoading: isCashbookLoading } = useDoc<CashBook>(cashbookDocRef);
 
-  // Load data from Firestore and sync local state
   useEffect(() => {
     if (cashbookData) {
       const loadedHeaders = cashbookData.headers || ["Header 1", "Header 2", "Header 3"];
@@ -67,7 +66,6 @@ export function CashBookPage() {
         setGridData([["", "", ""], ["", "", ""], ["", "", ""]]);
       }
 
-      // Sync UI state from Firestore
       setSelectedRows(new Set(cashbookData.selectedRows || []));
       setSelectedCols(new Set(cashbookData.selectedCols || []));
       setChartType(cashbookData.chartType || 'bar');
@@ -75,7 +73,6 @@ export function CashBookPage() {
       setIsAiAnalysisVisible(cashbookData.isAiAnalysisVisible || false);
 
     } else if (!isCashbookLoading) {
-      // Initialize for a new document
       const initialHeaders = ["Header 1", "Header 2", "Header 3"];
       setHeaders(initialHeaders);
       setGridData([
@@ -192,15 +189,13 @@ export function CashBookPage() {
     };
     
     setDocumentNonBlocking(cashbookDocRef, dataToSync, { merge: true });
-    
   }, [cashbookDocRef, gridData, headers, selectedRows, selectedCols, chartType, isChartVisible, isAiAnalysisVisible]);
   
-  // Real-time save effect for all data and UI state
   useEffect(() => {
     if (isCashbookLoading) return;
     const handler = setTimeout(() => {
       saveData();
-    }, 1000); // Debounce saves to every 1 second
+    }, 1000); 
 
     return () => clearTimeout(handler);
   }, [gridData, headers, selectedRows, selectedCols, chartType, isChartVisible, isAiAnalysisVisible, isCashbookLoading, saveData]);
@@ -284,7 +279,7 @@ export function CashBookPage() {
 
     const data = Array.from(selectedRows).map(rowIndex => {
         const row = viewData[rowIndex];
-        if (!row) return null; // FIX: Guard against undefined row
+        if (!row) return null;
         const chartEntry: {[key: string]: string | number} = {
             name: row[labelColumnIndex] || `Row ${rowIndex + 1}`
         };
@@ -298,7 +293,7 @@ export function CashBookPage() {
             }
         });
         return chartEntry;
-    }).filter(Boolean) as any[]; // Filter out null entries
+    }).filter(Boolean) as any[];
 
     setChartData(data);
   }, [isChartVisible, selectedRows, selectedCols, viewData, headers, chartType, toast]);
@@ -338,7 +333,6 @@ export function CashBookPage() {
     }
   }, [isAiAnalysisVisible, selectedRows, selectedCols, headers, viewData]);
   
-  // Effect for real-time chart data generation and AI analysis
   useEffect(() => {
     generateChartData();
     runAiAnalysis();

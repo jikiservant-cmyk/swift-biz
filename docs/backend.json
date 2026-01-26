@@ -39,7 +39,6 @@
       "required": [
         "id",
         "title",
-        "assigneeId",
         "dueDate",
         "status"
       ]

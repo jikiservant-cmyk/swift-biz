@@ -13,9 +13,9 @@ import { TaskFormDialog } from "@/components/tasks/TaskPage";
 import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
 import { collection, query, where, Timestamp } from "firebase/firestore";
 import { Client, Task } from "@/lib/types";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { users as staticUsers } from '@/lib/data';
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 
 export default function Home() {
@@ -32,8 +32,7 @@ export default function Home() {
   const handleSaveTask = (taskData: Omit<Task, 'id' | 'dueDate' | 'userId'> & { id?: string; dueDate?: Date }) => {
     if (!firestore || !user) return;
 
-    // Creating a new task
-    const taskPayload: any = {
+    const taskPayload : any = {
       ...taskData,
       dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : Timestamp.now(),
       userId: user.uid,
@@ -41,14 +40,13 @@ export default function Home() {
     
     // Firestore's addDoc fails if an 'id' field is present but undefined.
     // When creating a new document, we must remove it.
-    if (!taskPayload.id) {
+    if ('id' in taskPayload) {
         delete taskPayload.id;
     }
 
     const tasksCol = collection(firestore, 'users', user.uid, 'tasks');
     addDocumentNonBlocking(tasksCol, taskPayload);
     toast({ title: 'Task created', description: 'A new task has been added to your list.' });
-    
     setIsTaskDialogOpen(false);
   };
 
@@ -81,5 +79,3 @@ export default function Home() {
     </div>
   );
 }
-
-    

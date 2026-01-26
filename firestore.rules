@@ -182,7 +182,7 @@ service cloud.firestore {
       allow list: if isSignedIn(); // Client must constrain query: .where(`members.${auth.uid}`, 'in', ['owner', 'viewer'])
       allow create: if isSignedIn() && isMember(request.resource.data); // Creator must be in the initial members map.
       allow update: if isExistingMember(resource.data);
-      allow delete: if isExistingMember(resource.data); // Simplified for prototyping; production may restrict to an 'owner' role.
+      allow delete: if isExistingMember(resource.data) && resource.data.members[request.auth.uid] == 'owner';
     }
 
     /**
@@ -267,4 +267,5 @@ service cloud.firestore {
 
   }
 }
+    
     
