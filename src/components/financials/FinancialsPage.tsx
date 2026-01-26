@@ -4,7 +4,7 @@
 import React, { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowUpRight, ArrowDownLeft, FileDown, MoreHorizontal, Edit, Trash } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownLeft, FileDown, MoreHorizontal, Edit, Trash, Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +21,8 @@ import { collection, doc, Timestamp, addDoc, updateDoc, deleteDoc } from "fireba
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart as BarChartIcon, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from 'lucide-react';
+import { Skeleton } from "@/components/ui/skeleton";
+import { analyzeFinancialData } from "@/ai/flows/financial-analysis";
 
 
 type TransactionDialogState = {
@@ -60,6 +62,10 @@ export function FinancialsPage() {
   const [dialogState, setDialogState] = useState<TransactionDialogState>({ isOpen: false, type: 'income', editingTransaction: null });
   const [activeTab, setActiveTab] = useState("income");
   const [chartType, setChartType] = useState<ChartType>('bar');
+  const [isAiAnalysisVisible, setIsAiAnalysisVisible] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
 
   const monthlyTxs = useMemo(() => {
     const now = new Date();
@@ -121,6 +127,49 @@ export function FinancialsPage() {
         title: "Delete Failed",
         description: error.message || "Could not remove the transaction.",
       });
+    }
+  };
+
+  const handleAnalysisClick = async () => {
+    if (isAiAnalysisVisible) {
+        setIsAiAnalysisVisible(false);
+        return;
+    }
+
+    if (monthlyTxs.length === 0) {
+        toast({
+            title: "Not enough data",
+            description: "There are no transactions for the current month to analyze.",
+            variant: "destructive"
+        });
+        return;
+    }
+
+    setIsAiAnalysisVisible(true);
+    setIsAnalyzing(true);
+    setAiAnalysis(null);
+
+    const incomeForAnalysis = monthlyTxs.filter(t => t.type === 'income');
+    const expensesForAnalysis = monthlyTxs.filter(t => t.type === 'expense');
+
+    try {
+        const result = await analyzeFinancialData({
+            monthlyIncome,
+            monthlyExpenses,
+            incomeTransactions: JSON.stringify(incomeForAnalysis, null, 2),
+            expenseTransactions: JSON.stringify(expensesForAnalysis, null, 2),
+        });
+        setAiAnalysis(result.analysis);
+    } catch (e) {
+        console.error(e);
+        toast({
+            title: "AI Analysis Failed",
+            description: "Could not generate analysis. You may have exceeded your usage quota.",
+            variant: "destructive",
+        });
+        setAiAnalysis("There was an error while analyzing the data.");
+    } finally {
+        setIsAnalyzing(false);
     }
   };
 
@@ -188,6 +237,9 @@ export function FinancialsPage() {
         title="Financials"
         actionButton={
           <div className="flex gap-2">
+            <Button onClick={handleAnalysisClick} disabled={isAnalyzing} variant="outline">
+              <Wand2 className="mr-2 h-4 w-4" /> {isAiAnalysisVisible ? 'Hide Analysis' : 'Analyze with AI'}
+            </Button>
             <Button variant="outline" onClick={() => toast({title: "Coming soon!", description: "CSV export will be available in a future update."})}>
               <FileDown className="mr-2 h-4 w-4" /> Export CSV
             </Button>
@@ -248,6 +300,36 @@ export function FinancialsPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {isAiAnalysisVisible && (
+        <Card className="mt-8">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wand2 className="h-5 w-5 text-primary" /> AI Financial Report
+                </CardTitle>
+                <CardDescription>
+                    AI-powered insights based on your recent financial activity. Click "Analyze with AI" to refresh the report.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isAnalyzing ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ) : aiAnalysis ? (
+                  <div className="prose prose-sm max-w-none text-foreground dark:prose-invert whitespace-pre-wrap">
+                    {aiAnalysis}
+                  </div>
+                ) : (
+                   <div className="flex items-center justify-center h-24 text-muted-foreground">
+                        Click "Analyze with AI" to generate a financial report.
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+      )}
 
       <TransactionFormDialog 
         state={dialogState} 
