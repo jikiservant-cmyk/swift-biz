@@ -28,7 +28,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { DbUser } from '@/lib/types';
-import { formatDistanceToNow, isWithinInterval, subMinutes, addMinutes } from 'date-fns';
+import { formatDistanceToNow, addMinutes } from 'date-fns';
 
 
 export function AdminUsersPage() {
@@ -74,9 +74,11 @@ export function AdminUsersPage() {
 
         if (user.lastSeen && user.lastSeen.toDate) {
             const lastSeenDate = user.lastSeen.toDate();
-            const threeMinutesAgo = subMinutes(new Date(), 3);
+            const now = new Date();
+            const ninetySecondsAgo = new Date(now.getTime() - (90 * 1000));
+            const oneMinuteFromNow = addMinutes(now, 1);
 
-            if (isWithinInterval(lastSeenDate, { start: threeMinutesAgo, end: addMinutes(new Date(), 1) })) {
+            if (lastSeenDate > ninetySecondsAgo && lastSeenDate < oneMinuteFromNow) {
                 return (
                     <div className="flex items-center gap-2 text-sm text-green-600">
                         <span className="relative flex h-2 w-2">
