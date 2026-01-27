@@ -4,37 +4,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * Core Philosophy: This ruleset enforces a hybrid security model. Data directly related to a user,
-     * such as their personal tasks, expenses, and income, is governed by a strict user-ownership model.
-     * All such data is stored within a user-specific document tree and is private. For collaborative
-     * data, like shared clients and their associated sub-collections (tasks, payments), the ruleset uses a
-     * role-based access control (RBAC) system managed through a `members` map on each document.
+     * Core Philosophy: This ruleset enforces a hybrid security model. User-private data is governed
+     * by a strict user-ownership model. Shared client data uses a role-based access control (RBAC)
+     * system managed through a `members` map. A global "admin" role exists that provides super-user
+     * access to all data for management purposes.
      *
-     * Data Structure: User-private data is hierarchically organized under `/users/{userId}`.
-     * Shared client data is structured under a top-level `/clients/{clientId}` collection, with related
-     * tasks, payments, and incomes in subcollections. Global, read-only data like `/categories` and
-     * `/alerts` exist at the top level.
+     * Data Structure: User-private data is under `/users/{userId}`. Shared client data is under
+     * `/clients/{clientId}`. Global data like `/categories` and `/alerts` is at the top level.
+     * Admin users are defined in a top-level `/admins` collection.
      *
      * Key Security Decisions:
-     * - User data is strictly private. No user can see or modify another user's private data.
-     * - Client data access is managed by a `members` map. A user must be listed in this map to
-     *   gain read or write access.
-     * - To ensure performant and simple rules, the `members` map from a parent client document is
-     *   denormalized (copied) onto every document in its subcollections (e.g., tasks, payments). This
-     *   avoids costly `get()` calls for most authorization checks.
-     * - Global collections (`/categories`, `/alerts`) are read-only for all signed-in users. Their
-     *   creation and modification must be handled by a trusted backend process (e.g., Cloud Functions).
-     * - Listing users is explicitly disallowed to protect user privacy.
-     *
-     * Denormalization for Authorization: The security model for `/clients` and their subcollections relies
-     * heavily on denormalization. Each document under `/clients/{clientId}/...` must contain its own copy
-     * of the `members` map. This allows rules to authorize `get`, `update`, and `delete` operations
-     * instantly without fetching the parent client document. For operations that require parent-level
-     * context, such as `list` or `create`, a single `get()` call is used to verify permissions on the
-     * parent client.
-     *
-     * Structural Segregation: The separation of private data into `/users/{userId}` and shared data into
-     * `/clients/{clientId}` provides a clear security boundary, simplifying rules and client-side queries.
+     * - User data is private to the owner, but accessible to admins.
+     * - Admins have read/write access to all user and client data to manage the application.
+     * - The `/admins` collection is only writable by other admins, creating a chain of trust.
+     *   The first admin must be added manually via the Firebase Console.
+     * - Client data access is managed by a `members` map, but admins can also access it.
+     * - Denormalization of the `members` map is used for performance, avoiding `get()` calls.
+     * - Listing users is only allowed for admins to protect user privacy.
      */
 
     // --------------------------------------------------------------------------------
@@ -60,6 +46,14 @@ service cloud.firestore {
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
+    }
+    
+    /**
+     * Checks if the current user is a designated admin.
+     * This performs a single read and its result is automatically cached per request.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
@@ -87,82 +81,75 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------------------
+    // Admin Data
+    // --------------------------------------------------------------------------------
+
+    /**
+     * @description Collection to manage admin users. Only other admins can add or remove admins.
+     * @path /admins/{userId}
+     * @allow (write) An existing admin creating a new document in '/admins/'.
+     * @deny (write) A non-admin user trying to make themselves an admin.
+     * @principle Secures administrative control to a trusted group of users.
+     */
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+
+    // --------------------------------------------------------------------------------
     // User Data
     // --------------------------------------------------------------------------------
 
     /**
-     * @description A user can create their own profile, and only they can read or modify it.
+     * @description A user can create their own profile. Only they or an admin can read/modify it.
      * @path /users/{userId}
-     * @allow (create) An authenticated user with UID 'user_abc' creating '/users/user_abc'.
-     * @deny (get) User 'user_xyz' trying to read '/users/user_abc'.
-     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     * @allow (get) Admin reading '/users/user_abc'.
+     * @deny (list) Non-admin trying to list all users.
+     * @principle Admins have oversight, while user privacy is maintained from other users.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // Disallow listing users for privacy
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin(); // Only admins can list users
+      allow create: if isOwner(userId);
+      allow update: if (isOwner(userId) || isAdmin()) && request.resource.data.id == resource.data.id;
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     /**
-     * @description A user can manage their own private tasks.
+     * @description A user can manage their own private tasks. Admins have full access.
      * @path /users/{userId}/tasks/{taskId}
-     * @allow (create) User 'user_abc' creating a task under '/users/user_abc/tasks/'.
-     * @deny (list) User 'user_xyz' trying to list tasks under '/users/user_abc/tasks/'.
-     * @principle Enforces strict ownership for all data within a user's private data tree.
+     * @principle Enforces ownership but allows admin intervention.
      */
     match /users/{userId}/tasks/{taskId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow read, write: if isOwner(userId) || isAdmin();
     }
     
     /**
-     * @description A user can manage their own cash book.
+     * @description A user can manage their own cash book. Admins have full access.
      * @path /users/{userId}/cashbooks/{cashbookId}
-     * @allow (create) User 'user_abc' creating a cashbook under '/users/user_abc/cashbooks/'.
-     * @deny (list) User 'user_xyz' trying to list cashbooks under '/users/user_abc/cashbooks/'.
-     * @principle Enforces strict ownership for all data within a user's private data tree.
+     * @principle Enforces ownership but allows admin intervention.
      */
     match /users/{userId}/cashbooks/{cashbookId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow read, write: if isOwner(userId) || isAdmin();
     }
 
     /**
-     * @description A user can manage their own private expenses.
+     * @description A user can manage their own private expenses. Admins have full access.
      * @path /users/{userId}/expenses/{expenseId}
-     * @allow (create) User 'user_abc' creating an expense under '/users/user_abc/expenses/'.
-     * @deny (get) User 'user_xyz' trying to read an expense from '/users/user_abc/expenses/'.
-     * @principle Enforces strict ownership for all data within a user's private data tree.
+     * @principle Enforces ownership but allows admin intervention.
      */
     match /users/{userId}/expenses/{expenseId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow read, write: if isOwner(userId) || isAdmin();
     }
 
     /**
-     * @description A user can manage their own private income records.
+     * @description A user can manage their own private income records. Admins have full access.
      * @path /users/{userId}/incomes/{incomeId}
-     * @allow (create) User 'user_abc' creating an income record under '/users/user_abc/incomes/'.
-     * @deny (delete) User 'user_xyz' trying to delete an income record from '/users/user_abc/incomes/'.
-     * @principle Enforces strict ownership for all data within a user's private data tree.
+     * @principle Enforces ownership but allows admin intervention.
      */
     match /users/{userId}/incomes/{incomeId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow read, write: if isOwner(userId) || isAdmin();
     }
 
     // --------------------------------------------------------------------------------
@@ -170,64 +157,55 @@ service cloud.firestore {
     // --------------------------------------------------------------------------------
 
     /**
-     * @description Client documents are shared among a set of users defined in a `members` map.
-     *              Any member can read/update the client, but only an 'owner' can delete or manage members.
+     * @description Client documents are shared via a `members` map. Admins have override access.
      * @path /clients/{clientId}
-     * @allow (get) User 'user_abc' reading '/clients/client_123' if they are in its `members` map.
-     * @deny (update) A member with a 'viewer' role trying to update the client's notes.
-     * @principle Implements collaborative access using a roles map on the document itself.
+     * @principle Implements collaborative access with an admin override.
      */
     match /clients/{clientId} {
-      allow get: if isMember(resource.data);
-      allow list: if isSignedIn(); // Client must constrain query: .where(`members.${auth.uid}`, 'in', ['owner', 'viewer'])
-      allow create: if isSignedIn() && isMember(request.resource.data); // Creator must be in the initial members map.
-      allow update: if isExistingMember(resource.data);
-      allow delete: if isExistingMember(resource.data) && resource.data.members[request.auth.uid] == 'owner';
+      allow get: if isMember(resource.data) || isAdmin();
+      allow list: if isSignedIn(); // Client must constrain query: .where(`members.${auth.uid}`, 'in', ...) or be an admin
+      allow create: if isSignedIn() && isMember(request.resource.data) || isAdmin();
+      allow update: if isExistingMember(resource.data) || isAdmin();
+      allow delete: if (isExistingMember(resource.data) && resource.data.members[request.auth.uid] == 'owner') || isAdmin();
     }
 
     /**
-     * @description Client tasks are accessible to all members of the parent client.
+     * @description Client tasks are accessible to client members or admins.
      * @path /clients/{clientId}/tasks/{taskId}
-     * @allow (get) A user reading a task if their UID is in the task's denormalized `members` map.
-     * @deny (create) A user trying to create a task for a client they are not a member of.
-     * @principle Uses denormalized auth data (members map) to avoid `get` calls on single-doc reads.
+     * @principle Uses denormalized auth data but allows admin override.
      */
     match /clients/{clientId}/tasks/{taskId} {
-      allow get: if isMember(resource.data);
-      allow list: if isParentClientMember(clientId);
-      allow create: if isParentClientMember(clientId) && request.resource.data.clientId == clientId;
-      allow update: if isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId;
-      allow delete: if isExistingMember(resource.data);
+      allow get: if isMember(resource.data) || isAdmin();
+      allow list: if isParentClientMember(clientId) || isAdmin();
+      allow create: if (isParentClientMember(clientId) && request.resource.data.clientId == clientId) || isAdmin();
+      allow update: if (isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId) || isAdmin();
+      allow delete: if isExistingMember(resource.data) || isAdmin();
     }
 
     /**
-     * @description Client payments are accessible to all members of the parent client.
+     * @description Client payments are accessible to client members or admins.
      * @path /clients/{clientId}/payments/{paymentId}
-     * @allow (list) A user listing payments if they are a member of the parent client.
-     * @deny (get) A non-member trying to read a specific payment document.
-     * @principle Uses denormalized auth data (members map) to avoid `get` calls on single-doc reads.
+     * @principle Uses denormalized auth data but allows admin override.
      */
     match /clients/{clientId}/payments/{paymentId} {
-      allow get: if isMember(resource.data);
-      allow list: if isParentClientMember(clientId);
-      allow create: if isParentClientMember(clientId) && request.resource.data.clientId == clientId;
-      allow update: if isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId;
-      allow delete: if isExistingMember(resource.data);
+      allow get: if isMember(resource.data) || isAdmin();
+      allow list: if isParentClientMember(clientId) || isAdmin();
+      allow create: if (isParentClientMember(clientId) && request.resource.data.clientId == clientId) || isAdmin();
+      allow update: if (isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId) || isAdmin();
+      allow delete: if isExistingMember(resource.data) || isAdmin();
     }
 
     /**
-     * @description Client income records are accessible to all members of the parent client.
+     * @description Client income records are accessible to client members or admins.
      * @path /clients/{clientId}/incomes/{incomeId}
-     * @allow (update) A member updating an income record under a client they have access to.
-     * @deny (create) A user creating an income record with a mismatched `clientId`.
-     * @principle Validates relational integrity between documents and parent collection.
+     * @principle Uses denormalized auth data but allows admin override.
      */
     match /clients/{clientId}/incomes/{incomeId} {
-      allow get: if isMember(resource.data);
-      allow list: if isParentClientMember(clientId);
-      allow create: if isParentClientMember(clientId) && request.resource.data.clientId == clientId;
-      allow update: if isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId;
-      allow delete: if isExistingMember(resource.data);
+      allow get: if isMember(resource.data) || isAdmin();
+      allow list: if isParentClientMember(clientId) || isAdmin();
+      allow create: if (isParentClientMember(clientId) && request.resource.data.clientId == clientId) || isAdmin();
+      allow update: if (isExistingMember(resource.data) && request.resource.data.clientId == resource.data.clientId) || isAdmin();
+      allow delete: if isExistingMember(resource.data) || isAdmin();
     }
 
 
@@ -236,36 +214,27 @@ service cloud.firestore {
     // --------------------------------------------------------------------------------
 
     /**
-     * @description Categories are global and readable by any authenticated user, but not writable.
+     * @description Categories are global and readable by any authenticated user, but not writable by clients.
      * @path /categories/{categoryId}
-     * @allow (get) Any signed-in user reading a category document.
-     * @deny (create) Any client trying to create a new category.
-     * @principle Secures global data as read-only, assuming writes are handled by a trusted backend.
+     * @principle Secures global data as read-only for clients, but allows admin modification.
      */
     match /categories/{categoryId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow write: if isAdmin();
     }
 
     /**
-     * @description Alerts are readable by any authenticated user, but not writable from the client.
+     * @description Alerts are readable by any authenticated user, but not writable from the client. Admins can manage them.
      * @path /alerts/{alertId}
-     * @allow (list) Any signed-in user listing all system alerts.
-     * @deny (delete) Any client trying to delete an alert.
-     * @principle Secures global data as read-only, assuming writes are handled by a trusted backend.
+     * @principle Secures global data as read-only for clients, assuming writes are handled by a trusted backend or an admin.
      */
     match /alerts/{alertId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow write: if isAdmin();
     }
 
   }
 }
-    
     

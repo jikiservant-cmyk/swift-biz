@@ -12,6 +12,7 @@ import {
   LogOut,
   User as UserIcon,
   Calculator,
+  Shield,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +36,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useFirebase } from "@/firebase";
+import { useAdmin } from "@/hooks/use-admin";
+
 
 const menuItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -47,6 +50,7 @@ const menuItems = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, auth } = useFirebase();
+  const { isAdmin } = useAdmin();
 
   const handleLogout = () => {
     if (auth) {
@@ -118,6 +122,23 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+          {isAdmin && (
+            <>
+              <SidebarSeparator />
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith('/admin')}
+                  tooltip="Admin"
+                >
+                  <Link href="/admin/users">
+                    <Shield />
+                    <span>Admin</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
+          )}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>

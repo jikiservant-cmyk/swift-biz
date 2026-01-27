@@ -5,6 +5,13 @@ export type User = {
   initials: string;
 };
 
+export type DbUser = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+};
+
 export type Task = {
   id: string;
   title: string;
@@ -52,4 +59,8 @@ export type CashBook = {
   isAiAnalysisVisible?: boolean;
 };
 
+export type AdminUser = {
+  userId: string;
+  addedAt: Date;
+};
     
