@@ -118,14 +118,15 @@ service cloud.firestore {
     // --------------------------------------------------------------------------------
 
     /**
-     * @description A user can create their own profile. Only they (if enabled) or an admin can read/modify it.
+     * @description A user can create their own profile. Only they or an admin can read/modify it.
      * @path /users/{userId}
      * @allow (get) Admin reading '/users/user_abc'.
      * @deny (list) Non-admin trying to list all users.
-     * @principle Admins have oversight, while user privacy is maintained. Disabled users are blocked.
+     * @principle Admins have oversight, while user privacy is maintained. Disabled users are blocked from other resources.
      */
     match /users/{userId} {
-      allow get: if (isOwner(userId) && isEnabled(userId)) || isAdmin();
+      // A user can always read their own profile, which is necessary to check if they are disabled.
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin(); // Only admins can list users
       allow create: if isOwner(userId);
       // A user can always update their own lastSeen timestamp.
@@ -255,5 +256,3 @@ service cloud.firestore {
 
   }
 }
-    
-    
