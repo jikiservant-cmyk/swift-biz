@@ -4,7 +4,6 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Skeleton } from './ui/skeleton';
@@ -40,17 +39,31 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user && firestore) {
       const userDocRef = doc(firestore, 'users', user.uid);
-      // This is a fire-and-forget update. We don't want to block UI rendering
-      // or show an error to the user if it fails, as our security rules are
-      // configured to allow this specific update.
-      updateDoc(userDocRef, {
-        lastSeen: serverTimestamp()
-      }).catch(err => {
-        // Log error in development for debugging, but don't bother the user.
-        if (process.env.NODE_ENV === 'development') {
-          console.error("Failed to update last seen timestamp:", err.message);
-        }
-      });
+      
+      const updateUserPresence = () => {
+        // This is a fire-and-forget update. We don't want to block UI rendering
+        // or show an error to the user if it fails, as our security rules are
+        // configured to allow this specific update.
+        updateDoc(userDocRef, {
+          lastSeen: serverTimestamp()
+        }).catch(err => {
+          // Log error in development for debugging, but don't bother the user.
+          if (process.env.NODE_ENV === 'development') {
+            console.error("Failed to update last seen timestamp:", err.message);
+          }
+        });
+      };
+      
+      // Update once immediately to set the initial online status
+      updateUserPresence();
+
+      // Then, update every 4 minutes to keep the status fresh.
+      // This is frequent enough to stay within the 5-minute "online" window
+      // but infrequent enough to conserve Firestore write operations.
+      const intervalId = setInterval(updateUserPresence, 4 * 60 * 1000);
+
+      // Clean up the interval when the component unmounts or the user changes
+      return () => clearInterval(intervalId);
     }
   }, [user, firestore]);
 
@@ -83,5 +96,3 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
