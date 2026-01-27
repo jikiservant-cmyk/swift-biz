@@ -1,11 +1,12 @@
 'use client';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { PageHeader } from '../PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Button } from '../ui/button';
-import { Trash } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { MoreHorizontal, Trash, UserSlash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -18,6 +19,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { DbUser } from '@/lib/types';
 
 
@@ -44,6 +52,19 @@ export function AdminUsersPage() {
         }
     };
 
+    const handleToggleDisable = async (user: DbUser) => {
+        if (!firestore) return;
+        const userDocRef = doc(firestore, 'users', user.id);
+        try {
+            await updateDoc(userDocRef, {
+                disabled: !user.disabled
+            });
+            toast({ title: `User ${!user.disabled ? 'disabled' : 'enabled'}`, description: `The user account for ${user.email} has been updated.` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update failed', description: error.message });
+        }
+    };
+
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
             <PageHeader title="Admin - User Management" />
@@ -59,50 +80,69 @@ export function AdminUsersPage() {
                                 <TableHead>User ID</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Name</TableHead>
+                                <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center">Loading users...</TableCell>
+                                    <TableCell colSpan={5} className="text-center">Loading users...</TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && error && (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center text-destructive">
+                                    <TableCell colSpan={5} className="text-center text-destructive">
                                         Error: Could not load users.
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && !error && users?.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center">No users found.</TableCell>
+                                    <TableCell colSpan={5} className="text-center">No users found.</TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && !error && users?.map(user => (
-                                <TableRow key={user.id}>
+                                <TableRow key={user.id} className={user.disabled ? 'bg-muted/50 text-muted-foreground' : ''}>
                                     <TableCell className="font-mono text-xs">{user.id}</TableCell>
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>{user.firstName} {user.lastName}</TableCell>
+                                    <TableCell>
+                                        {user.disabled ? <Badge variant="destructive">Disabled</Badge> : <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">Active</Badge>}
+                                    </TableCell>
                                     <TableCell className="text-right">
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="icon" title="Delete user data"><Trash className="h-4 w-4" /></Button>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                This action will delete the user's data document from Firestore. It will NOT delete their authentication record. This cannot be undone.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                              <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Continue</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleToggleDisable(user)}>
+                                                <UserSlash className="mr-2 h-4 w-4" />
+                                                <span>{user.disabled ? 'Enable' : 'Disable'}</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <AlertDialog>
+                                              <AlertDialogTrigger asChild>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                                                  <Trash className="mr-2 h-4 w-4" />
+                                                  <span>Delete</span>
+                                                </DropdownMenuItem>
+                                              </AlertDialogTrigger>
+                                              <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                  <AlertDialogDescription>
+                                                    This action will delete the user's data document from Firestore. It will NOT delete their authentication record. This cannot be undone.
+                                                  </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                  <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Continue</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                              </AlertDialogContent>
+                                            </AlertDialog>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
                             ))}

@@ -65,6 +65,10 @@
           "type": "string",
           "description": "Email address of the user.",
           "format": "email"
+        },
+        "disabled": {
+          "type": "boolean",
+          "description": "Whether the user account is disabled."
         }
       },
       "required": [

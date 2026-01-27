@@ -10,6 +10,7 @@ export type DbUser = {
   email: string;
   firstName: string;
   lastName: string;
+  disabled?: boolean;
 };
 
 export type Task = {
