@@ -27,7 +27,7 @@ export function AdminUsersPage() {
 
     // This query is allowed by the new security rules for admins
     const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users'): null, [firestore]);
-    const { data: users, isLoading } = useCollection<DbUser>(usersQuery);
+    const { data: users, isLoading, error } = useCollection<DbUser>(usersQuery);
 
     const handleDeleteUser = async (userId: string) => {
         if (!firestore) return;
@@ -63,8 +63,24 @@ export function AdminUsersPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isLoading && <TableRow><TableCell colSpan={4} className="text-center">Loading users...</TableCell></TableRow>}
-                            {users?.map(user => (
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">Loading users...</TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && error && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center text-destructive">
+                                        Error: Could not load users.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && !error && users?.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">No users found.</TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && !error && users?.map(user => (
                                 <TableRow key={user.id}>
                                     <TableCell className="font-mono text-xs">{user.id}</TableCell>
                                     <TableCell>{user.email}</TableCell>
