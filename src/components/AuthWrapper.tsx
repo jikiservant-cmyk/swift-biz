@@ -57,10 +57,8 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
       // Update once immediately to set the initial online status
       updateUserPresence();
 
-      // Then, update every 4 minutes to keep the status fresh.
-      // This is frequent enough to stay within the 5-minute "online" window
-      // but infrequent enough to conserve Firestore write operations.
-      const intervalId = setInterval(updateUserPresence, 4 * 60 * 1000);
+      // Then, update every minute to keep the status fresh.
+      const intervalId = setInterval(updateUserPresence, 60 * 1000);
 
       // Clean up the interval when the component unmounts or the user changes
       return () => clearInterval(intervalId);

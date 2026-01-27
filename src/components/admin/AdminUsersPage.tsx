@@ -1,3 +1,4 @@
+
 'use client';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -73,9 +74,9 @@ export function AdminUsersPage() {
 
         if (user.lastSeen && user.lastSeen.toDate) {
             const lastSeenDate = user.lastSeen.toDate();
-            const fiveMinutesAgo = subMinutes(new Date(), 5);
+            const twoMinutesAgo = subMinutes(new Date(), 2);
 
-            if (isWithinInterval(lastSeenDate, { start: fiveMinutesAgo, end: new Date() })) {
+            if (isWithinInterval(lastSeenDate, { start: twoMinutesAgo, end: new Date() })) {
                 return (
                     <div className="flex items-center gap-2 text-sm text-green-600">
                         <span className="relative flex h-2 w-2">
