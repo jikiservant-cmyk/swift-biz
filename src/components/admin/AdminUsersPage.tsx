@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { MoreHorizontal, Trash, UserSlash } from 'lucide-react';
+import { MoreHorizontal, Trash, Ban, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -117,7 +117,7 @@ export function AdminUsersPage() {
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end">
                                             <DropdownMenuItem onClick={() => handleToggleDisable(user)}>
-                                                <UserSlash className="mr-2 h-4 w-4" />
+                                                {user.disabled ? <UserCheck className="mr-2 h-4 w-4" /> : <Ban className="mr-2 h-4 w-4" />}
                                                 <span>{user.disabled ? 'Enable' : 'Disable'}</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
