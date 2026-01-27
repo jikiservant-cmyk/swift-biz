@@ -90,7 +90,7 @@ export function AdminUsersPage() {
             return <span className="text-sm text-muted-foreground">{`Seen ${formatDistanceToNow(lastSeenDate, { addSuffix: true })}`}</span>;
         }
         
-        return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">Active</Badge>;
+        return <span className="text-sm text-muted-foreground">No activity recorded</span>;
     }
 
     return (
@@ -181,5 +181,3 @@ export function AdminUsersPage() {
         </div>
     );
 }
-
-    
