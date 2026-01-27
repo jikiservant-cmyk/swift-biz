@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -7,7 +6,7 @@ import { useFirebase } from '@/firebase';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Skeleton } from './ui/skeleton';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 const AUTH_ROUTES = ['/login', '/signup'];
 const PUBLIC_ROUTES: string[] = []; 
@@ -41,12 +40,12 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(firestore, 'users', user.uid);
       
       const updateUserPresence = () => {
-        // This is a fire-and-forget update. We don't want to block UI rendering
-        // or show an error to the user if it fails, as our security rules are
-        // configured to allow this specific update.
-        updateDoc(userDocRef, {
+        // Use setDoc with merge:true to create the doc if it doesn't exist,
+        // or update it if it does. This resolves a race condition during signup
+        // where this update might run before the user document is created.
+        setDoc(userDocRef, {
           lastSeen: serverTimestamp()
-        }).catch(err => {
+        }, { merge: true }).catch(err => {
           // Log error in development for debugging, but don't bother the user.
           if (process.env.NODE_ENV === 'development') {
             console.error("Failed to update last seen timestamp:", err.message);
