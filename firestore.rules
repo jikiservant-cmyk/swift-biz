@@ -89,6 +89,13 @@ service cloud.firestore {
       return isSignedIn() && isEnabled(request.auth.uid) && request.auth.uid in clientData.members;
     }
 
+    /**
+     * Checks if the only field being updated is 'lastSeen'.
+     */
+    function isUpdatingLastSeen() {
+      return request.resource.data.keys().hasOnly(['lastSeen']);
+    }
+
     // --------------------------------------------------------------------------------
     // Admin Data
     // --------------------------------------------------------------------------------
@@ -121,7 +128,9 @@ service cloud.firestore {
       allow get: if (isOwner(userId) && isEnabled(userId)) || isAdmin();
       allow list: if isAdmin(); // Only admins can list users
       allow create: if isOwner(userId);
-      allow update: if isAdmin() || (isOwner(userId) && isEnabled(userId));
+      // A user can always update their own lastSeen timestamp.
+      // Otherwise, they must be enabled to update their profile, or the request must be from an admin.
+      allow update: if (isOwner(userId) && isUpdatingLastSeen()) || isAdmin() || (isOwner(userId) && isEnabled(userId));
       allow delete: if isOwner(userId) || isAdmin();
     }
 
@@ -246,4 +255,5 @@ service cloud.firestore {
 
   }
 }
+    
     

@@ -8,12 +8,13 @@ import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Skeleton } from './ui/skeleton';
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 const AUTH_ROUTES = ['/login', '/signup'];
 const PUBLIC_ROUTES: string[] = []; 
 
 export function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const { user, isUserLoading, auth } = useFirebase();
+  const { user, isUserLoading, auth, firestore } = useFirebase();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -35,6 +36,23 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user, isUserLoading, pathname, router, auth]);
+
+  useEffect(() => {
+    if (user && firestore) {
+      const userDocRef = doc(firestore, 'users', user.uid);
+      // This is a fire-and-forget update. We don't want to block UI rendering
+      // or show an error to the user if it fails, as our security rules are
+      // configured to allow this specific update.
+      updateDoc(userDocRef, {
+        lastSeen: serverTimestamp()
+      }).catch(err => {
+        // Log error in development for debugging, but don't bother the user.
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Failed to update last seen timestamp:", err.message);
+        }
+      });
+    }
+  }, [user, firestore]);
 
   const isAuthRoute = AUTH_ROUTES.includes(pathname);
 
@@ -65,3 +83,5 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    

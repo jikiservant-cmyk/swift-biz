@@ -11,6 +11,7 @@ export type DbUser = {
   firstName: string;
   lastName: string;
   disabled?: boolean;
+  lastSeen?: any;
 };
 
 export type Task = {
@@ -64,4 +65,5 @@ export type AdminUser = {
   userId: string;
   addedAt: Date;
 };
+    
     

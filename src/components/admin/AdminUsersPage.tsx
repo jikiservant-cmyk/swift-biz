@@ -27,6 +27,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { DbUser } from '@/lib/types';
+import { formatDistanceToNow, isWithinInterval, subMinutes } from 'date-fns';
 
 
 export function AdminUsersPage() {
@@ -64,6 +65,33 @@ export function AdminUsersPage() {
             toast({ variant: 'destructive', title: 'Update failed', description: error.message });
         }
     };
+
+    const renderStatus = (user: DbUser) => {
+        if (user.disabled) {
+            return <Badge variant="destructive">Disabled</Badge>;
+        }
+
+        if (user.lastSeen && user.lastSeen.toDate) {
+            const lastSeenDate = user.lastSeen.toDate();
+            const fiveMinutesAgo = subMinutes(new Date(), 5);
+
+            if (isWithinInterval(lastSeenDate, { start: fiveMinutesAgo, end: new Date() })) {
+                return (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        <span>Online</span>
+                    </div>
+                );
+            }
+
+            return <span className="text-sm text-muted-foreground">{`Seen ${formatDistanceToNow(lastSeenDate, { addSuffix: true })}`}</span>;
+        }
+        
+        return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">Active</Badge>;
+    }
 
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
@@ -108,7 +136,7 @@ export function AdminUsersPage() {
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>{user.firstName} {user.lastName}</TableCell>
                                     <TableCell>
-                                        {user.disabled ? <Badge variant="destructive">Disabled</Badge> : <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">Active</Badge>}
+                                        {renderStatus(user)}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
@@ -153,3 +181,5 @@ export function AdminUsersPage() {
         </div>
     );
 }
+
+    
