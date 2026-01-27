@@ -74,9 +74,9 @@ export function AdminUsersPage() {
 
         if (user.lastSeen && user.lastSeen.toDate) {
             const lastSeenDate = user.lastSeen.toDate();
-            const twoMinutesAgo = subMinutes(new Date(), 2);
+            const threeMinutesAgo = subMinutes(new Date(), 3);
 
-            if (isWithinInterval(lastSeenDate, { start: twoMinutesAgo, end: new Date() })) {
+            if (isWithinInterval(lastSeenDate, { start: threeMinutesAgo, end: new Date() })) {
                 return (
                     <div className="flex items-center gap-2 text-sm text-green-600">
                         <span className="relative flex h-2 w-2">
