@@ -1,0 +1,27 @@
+mutation AddNewTask($farmId: UUID!, $description: String!, $dueDate: Date!, $status: String!) @auth(level: USER) {
+  task_insert(data: {farmId: $farmId, description: $description, dueDate: $dueDate, status: $status})
+}
+
+query ListTasksForFarm($farmId: UUID!) @auth(level: USER) {
+  tasks(where: {farmId: {eq: $farmId}}) {
+    id
+    description
+    dueDate
+    status
+  }
+}
+
+mutation UpdateTaskStatus($id: UUID!, $status: String!) @auth(level: USER) {
+  task_update(key: {id: $id}, data: {status: $status})
+}
+
+query ListAllCrops @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  crops {
+    id
+    name
+    cropType
+    description
+    harvestSeason
+    plantingSeason
+  }
+}

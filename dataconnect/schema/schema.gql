@@ -1,0 +1,64 @@
+type Farm @table {
+  name: String!
+  location: String!
+  sizeAcres: Float
+  ownerName: String
+}
+
+type Field @table {
+  farm: Farm!
+  name: String!
+  sizeAcres: Float!
+  soilType: String
+  notes: String
+}
+
+type Crop @table {
+  name: String!
+  cropType: String!
+  description: String
+  plantingSeason: String
+  harvestSeason: String
+}
+
+type CropCycle @table {
+  field: Field!
+  crop: Crop!
+  plantingDate: Date!
+  expectedHarvestDate: Date!
+  actualHarvestDate: Date
+  yieldQuantity: Float
+  yieldUnit: String
+}
+
+type Livestock @table {
+  farm: Farm!
+  animalType: String!
+  identifier: String!
+  breed: String
+  birthDate: Date
+  healthStatus: String
+  notes: String
+}
+
+type Equipment @table {
+  farm: Farm!
+  name: String!
+  type: String!
+  serialNumber: String
+  purchaseDate: Date
+  lastMaintenanceDate: Date
+  notes: String
+}
+
+type Task @table {
+  farm: Farm!
+  field: Field
+  livestock: Livestock
+  equipment: Equipment
+  description: String!
+  dueDate: Date!
+  status: String!
+  assignedTo: String
+  completionDate: Date
+}
